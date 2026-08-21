@@ -1,0 +1,215 @@
+:root {
+  color-scheme: light;
+}
+
+.aicc-chat-messages {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+  font-size: 14px;
+  background: rgba(var(--aicc-background-color));
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.aicc-chat-placeholder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  text-align: center;
+  pointer-events: none;
+  opacity: 1;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.aicc-chat-placeholder-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 12px;
+  letter-spacing: -0.5px;
+}
+
+.aicc-chat-placeholder-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  color: #6b7280;
+  line-height: 1.6;
+  max-width: 260px;
+  margin: auto;
+}
+
+.aicc-chat-message-wrapper {
+  display: flex;
+  margin-bottom: 12px;
+}
+
+.aicc-chat-message-wrapper-user {
+  justify-content: flex-end;
+}
+
+.aicc-chat-message-wrapper-bot {
+  justify-content: flex-start;
+}
+
+.aicc-chat-message {
+  max-width: 75%;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: 18px;
+  padding: 10px 14px;
+}
+
+.aicc-chat-message-user {
+  background: rgba(var(--aicc-user-color));
+  color: #ffffff;
+}
+
+.aicc-chat-message-bot {
+  background: rgba(var(--aicc-bot-color));
+  color: #111827;
+}
+
+.aicc-chat-input-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px;
+  padding: 8px;
+  border-radius: 24px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  box-sizing: border-box;
+}
+
+.aicc-chat-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: #111827;
+}
+
+.aicc-chat-send-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(var(--aicc-theme-color));
+  color: white;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.aicc-chat-send-btn:hover {
+  transform: scale(1.08);
+}
+
+.aicc-chatbot-container button,
+.aicc-chatbot-container input {
+  font: inherit;
+}
+
+.aicc-chat-message-streaming::after {
+  content: '▋';
+  display: inline-block;
+  margin-left: 2px;
+  animation: aicc-blink 1s infinite;
+}
+
+@keyframes aicc-blink {
+
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+
+/* Markdown styles */
+/* Overall message text */
+.aicc-chat-message-bot {
+  line-height: 1.4;
+}
+
+/* Headings */
+.aicc-chat-message-bot h1,
+.aicc-chat-message-bot h2,
+.aicc-chat-message-bot h3,
+.aicc-chat-message-bot h4 {
+  margin: 0.45rem 0 0.25rem;
+  line-height: 1.2;
+}
+
+/* Paragraphs */
+.aicc-chat-message-bot p {
+  margin: 0.15rem 0;
+  line-height: 1.4;
+}
+
+/* Ordered / unordered lists */
+.aicc-chat-message-bot ul,
+.aicc-chat-message-bot ol {
+  margin: 0.15rem 0 0.15rem 1rem;
+  padding-left: 0.5rem;
+  line-height: 1.4;
+}
+
+/* List items */
+.aicc-chat-message-bot li {
+  margin: 0.08rem 0;
+}
+
+/* Nested lists */
+.aicc-chat-message-bot li>ul,
+.aicc-chat-message-bot li>ol {
+  margin-top: 0.08rem;
+  margin-bottom: 0.08rem;
+}
+
+/* Code blocks */
+.aicc-chat-message-bot pre {
+  background: #f3f8f4;
+  border: 1px solid rgba(var(--aicc-theme-color), 0.15);
+  padding: 10px;
+  margin: 0.3rem 0;
+  border-radius: 8px;
+  overflow-x: auto;
+  line-height: 1.4;
+}
+
+/* Inline code - green theme instead of pink */
+.aicc-chat-message-bot code:not(pre code) {
+  background: rgba(var(--aicc-theme-color), 0.12);
+  color: rgb(var(--aicc-theme-color));
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.95em;
+  font-weight: 600;
+}
+
+/* Remove extra spacing at top and bottom */
+.aicc-chat-message-bot>*:first-child {
+  margin-top: 0;
+}
+
+.aicc-chat-message-bot>*:last-child {
+  margin-bottom: 0;
+}

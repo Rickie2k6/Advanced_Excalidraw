@@ -1,0 +1,55 @@
+:root {
+  color-scheme: light;
+  --aicc-theme-color: 0, 105, 62; /*#00693E*/
+  --aicc-background-color: 243, 248, 244; /*#F3F8F4*/
+  --aicc-user-color: 0, 105, 62; /*#00693E*/
+  --aicc-bot-color: 218, 246, 220; /*#daf6dce0*/
+  --aicc-send-button-color: 95, 168, 99; /*#5fa863*/
+}
+
+.aicc-chatbot-container {
+  position: fixed;
+  bottom: 130px;
+  right: 32px;
+  width: 22vw;
+  height: 50vh;
+  min-width: 340px;
+  max-width: 420px;
+  min-height: 200px;
+  max-height: 700px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  display: none;
+  flex-direction: column;
+  z-index: 999999;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+  transform-origin: bottom right;
+  transition: none;
+}
+
+.aicc-chatbot-container.aicc-animating {
+    transition: opacity 220ms ease-out, transform 220ms cubic-bezier(0.16, 1, 0.3, 1), width 260ms ease, height 260ms ease, top 260ms ease, left 260ms ease, right 260ms ease, bottom 260ms ease, border-radius 220ms ease;
+}
+
+.aicc-chatbot-container.aicc-is-expanded {
+  top: 50%;
+  left: 50%;
+  bottom: auto;
+  right: auto;
+  transform-origin: center center;
+  transform: translate(-50%, -50%) scale(1);
+  width: 80vw;
+  height: 82vh;
+  max-width: 1100px;
+  min-height: 200px;
+  max-height: 900px;
+  border-radius: 16px;
+  overflow: auto;
+}
+
+.aicc-chatbot-container.aicc-is-expanded .aicc-chat-widget-header {
+    cursor: grab;
+}

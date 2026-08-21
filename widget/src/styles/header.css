@@ -1,0 +1,80 @@
+.aicc-chat-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(var(--aicc-theme-color));
+  color: white;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  user-select: none;
+  cursor: default;
+}
+
+.aicc-chat-avatar-wrapper {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+}
+
+.aicc-chat-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.aicc-chat-online-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #7CFC00;
+  right: 2px;
+  bottom: 2px;
+  border: 2px solid rgba(var(--aicc-theme-color));
+}
+
+.aicc-chat-title-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.aicc-chat-title {
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.aicc-chat-subtitle {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.aicc-chat-left-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.aicc-chat-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aicc-chat-maximize-btn {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 6px;
+  line-height: 1;
+}

@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+numpy
+pillow<12
+
+paddleocr[doc-parser]
+
+transformers>=5.0.0
+accelerate

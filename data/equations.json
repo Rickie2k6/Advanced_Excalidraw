@@ -1,0 +1,45 @@
+{
+  "updated_at": "2026-08-21T17:06:47.558242+00:00",
+  "equations": {
+    "eq_1311a0444c5a": {
+      "equation_id": "eq_1311a0444c5a",
+      "equation": "x=3",
+      "stroke_ids": [
+        "cLm4-T81HsddaG3ixF83x",
+        "Ug8SZC7yhhXCS8_fNZwVo",
+        "lYyIfnQn5VQ7q3hbGfjeG",
+        "aIv5_LYtPfoxwqDsInge5",
+        "8u3jM8CBoX6EFebE6IgAQ"
+      ],
+      "bbox": {
+        "x": 587.3515625,
+        "y": 290.14453125,
+        "width": 123.00390625,
+        "height": 51.3671875
+      },
+      "contributors": [
+        "2605:ad80:32:1d3:cd6e:cdc:126:3598"
+      ],
+      "confidence": null,
+      "updated_at": "2026-08-21T17:06:47.558242+00:00"
+    },
+    "eq_0a37c0d84fef": {
+      "equation_id": "eq_0a37c0d84fef",
+      "equation": "\\bullet",
+      "stroke_ids": [
+        "J-1kWuD_7le8QqFhNSuw5"
+      ],
+      "bbox": {
+        "x": 868.89453125,
+        "y": 354.20703125,
+        "width": 9.999999997489795e-05,
+        "height": 9.999999997489795e-05
+      },
+      "contributors": [
+        "2605:ad80:32:1d3:cd6e:cdc:126:3598"
+      ],
+      "confidence": null,
+      "updated_at": "2026-08-21T17:06:47.558242+00:00"
+    }
+  }
+}

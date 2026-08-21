@@ -1,0 +1,14 @@
+.aicc-course-badge {
+    position: fixed;
+    bottom: 90px;
+    left: 20px;
+    background: rgba(var(--aicc-theme-color), 0.5);
+    color: black;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    z-index: 999999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    opacity: 1;
+    transition: opacity 0.8s ease
+}
