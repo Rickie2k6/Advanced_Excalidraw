@@ -1,3 +1,7 @@
+//đây là command line chạy trong server: corepack yarn start --host 10.255.0.11
+/* gọi lệnh này để activate cái Cloudfkare Tunnel: ~/bin/cloudflared tunnel \
+  --url http://10.255.0.11:65533*/
+//sử dụng URL này: https://ronald-hughes-fifty-archives.trycloudflare.com
 import {
   Excalidraw,
   LiveCollaborationTrigger,
@@ -7,6 +11,7 @@ import {
   useEditorInterface,
   ExcalidrawAPIProvider,
   useExcalidrawAPI,
+  exportToBlob,
 } from "@excalidraw/excalidraw";
 import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
@@ -372,8 +377,526 @@ const initializeScene = async (opts: {
   return { scene: null, isExternalScene: false };
 };
 
+const CHATBOT_BACKEND_URL =
+  import.meta.env.VITE_APP_CHATBOT_BACKEND_URL || "";
+
+const CHATBOT_WIDGET_SRC =
+  import.meta.env.VITE_APP_CHATBOT_WIDGET_SRC;
+
+const GITHUB_URL =
+  import.meta.env.VITE_APP_GITHUB_URL;
+
+const X_URL =
+  import.meta.env.VITE_APP_X_URL;
+
+const DISCORD_URL =
+  import.meta.env.VITE_APP_DISCORD_URL;
+
+const YOUTUBE_URL =
+  import.meta.env.VITE_APP_YOUTUBE_URL;
+
+
+type EquationGroup = {
+  equation_id: string;
+  equation: string | null;
+  stroke_ids: string[];
+  bbox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  contributors: string[];
+  confidence: number | null;
+};
+
+type EquationGroupResponse = {
+  status: string;
+  count: number;
+  equations: Record<string, EquationGroup>;
+};
+// gọi chatbot-widget.js
 const ExcalidrawWrapper = () => {
   const excalidrawAPI = useExcalidrawAPI();
+
+useEffect(() => {
+  const initializePublicIPv4 = async () => {
+    try {
+      const response = await fetch(
+        `${CHATBOT_BACKEND_URL}/api/client-ip`,
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to get client IP: ${response.status}`,
+        );
+      }
+
+      const data = await response.json();
+
+      if (data.public_ip) {
+        (window as any).__chatbotPublicIPv4 =
+          data.public_ip;
+
+        console.log(
+          "[Client IP] Initialized:",
+          data.public_ip,
+        );
+      }
+    } catch (error) {
+      console.error(
+        "[Client IP] Failed to initialize:",
+        error,
+      );
+    }
+  };
+
+  initializePublicIPv4();
+}, []);
+  /**
+ * EN:
+ * Track freedraw elements that were started locally.
+ * The IP metadata is attached only after the stroke
+ * has finished, so active drawing is not interrupted.
+ *
+ * VI:
+ * Theo dõi các freedraw element được bắt đầu từ máy
+ * hiện tại. Metadata IP chỉ được gắn sau khi stroke
+ * hoàn thành để không làm gián đoạn quá trình vẽ.
+ */
+  const localFreedrawIdsRef = useRef<Set<string>>(
+    new Set(),
+  );
+
+  // ============================================================
+  // EQUATION GROUP -> PNG -> PADDLE OCR
+  // ============================================================
+
+  const equationPipelineRunningRef =
+    useRef(false);
+
+  const equationPipelinePendingRef =
+    useRef(false);
+
+  const syncEquationGroupsAndOcr =
+    useCallback(async () => {
+      if (!excalidrawAPI) {
+        return;
+      }
+
+      // Avoid running multiple Paddle pipelines
+      // at the same time.
+      if (
+        equationPipelineRunningRef.current
+      ) {
+        equationPipelinePendingRef.current =
+          true;
+
+        return;
+      }
+
+      equationPipelineRunningRef.current =
+        true;
+
+      try {
+        do {
+          equationPipelinePendingRef.current =
+            false;
+
+          // --------------------------------------------
+          // 1. Ask backend to group strokes.
+          // --------------------------------------------
+
+          const groupResponse = await fetch(
+            `${CHATBOT_BACKEND_URL}/api/equations/group`,
+            {
+              method: "POST",
+            },
+          );
+
+          if (!groupResponse.ok) {
+            throw new Error(
+              `Equation grouping failed: ${groupResponse.status}`,
+            );
+          }
+
+          const groupData =
+            (await groupResponse.json()) as EquationGroupResponse;
+
+          const equationGroups =
+            Object.values(
+              groupData.equations ?? {},
+            );
+
+          console.log(
+            "[Equation Group]",
+            `${equationGroups.length} group(s) found`,
+          );
+
+          // --------------------------------------------
+          // 2. OCR each equation that does not already
+          //    have a recognized equation.
+          // --------------------------------------------
+
+          for (const equation of equationGroups) {
+            if (equation.equation) {
+              console.log(
+                "[Equation OCR] Already recognized:",
+                equation.equation_id,
+                equation.equation,
+              );
+
+              continue;
+            }
+
+            if (!equation.stroke_ids.length) {
+              continue;
+            }
+
+            const strokeIdSet = new Set(
+              equation.stroke_ids,
+            );
+
+            const equationElements =
+              excalidrawAPI
+                .getSceneElements()
+                .filter((element) =>
+                  strokeIdSet.has(element.id),
+                );
+
+            if (!equationElements.length) {
+              console.warn(
+                "[Equation OCR] No scene elements found:",
+                equation.equation_id,
+              );
+
+              continue;
+            }
+
+            // ------------------------------------------
+            // 3. Export ONLY this equation group
+            //    as a PNG Blob.
+            // ------------------------------------------
+
+            const pngBlob =
+              await exportToBlob({
+                elements:
+                  equationElements,
+
+                appState: {
+                  ...excalidrawAPI.getAppState(),
+
+                  exportBackground:
+                    true,
+
+                  exportWithDarkMode:
+                    false,
+
+                  viewBackgroundColor:
+                    "#ffffff",
+                },
+
+                files:
+                  excalidrawAPI.getFiles(),
+
+                mimeType:
+                  "image/png",
+              });
+
+            console.log(
+              "[Equation PNG]",
+              equation.equation_id,
+              `${pngBlob.size} bytes`,
+            );
+
+            // ------------------------------------------
+            // 4. Send PNG to equation OCR endpoint.
+            // ------------------------------------------
+
+            const formData =
+              new FormData();
+
+            formData.append(
+              "image",
+              pngBlob,
+              `${equation.equation_id}.png`,
+            );
+
+            const ocrResponse =
+              await fetch(
+                `${CHATBOT_BACKEND_URL}/api/equations/${encodeURIComponent(
+                  equation.equation_id,
+                )}/ocr`,
+                {
+                  method: "POST",
+                  body: formData,
+                },
+              );
+
+            if (!ocrResponse.ok) {
+              const errorText =
+                await ocrResponse.text();
+
+              console.error(
+                "[Equation OCR] Failed:",
+                equation.equation_id,
+                ocrResponse.status,
+                errorText,
+              );
+
+              continue;
+            }
+
+            const ocrResult =
+              await ocrResponse.json();
+
+            console.log(
+              "[Equation OCR] Recognized:",
+              equation.equation_id,
+              "->",
+              ocrResult.equation,
+            );
+          }
+        } while (
+          equationPipelinePendingRef.current
+        );
+      } catch (error) {
+        console.error(
+          "[Equation Pipeline] Failed:",
+          error,
+        );
+      } finally {
+        equationPipelineRunningRef.current =
+          false;
+      }
+    }, [excalidrawAPI]);
+
+
+  const scheduleEquationOcr =
+    useCallback(() => {
+      if (equationOcrTimerRef.current) {
+        clearTimeout(
+          equationOcrTimerRef.current,
+        );
+      }
+
+      equationOcrTimerRef.current =
+        setTimeout(() => {
+          equationOcrTimerRef.current =
+            null;
+
+          void syncEquationGroupsAndOcr();
+        }, 2000);
+    }, [syncEquationGroupsAndOcr]);
+  // ============================================================
+  // STROKE JSON SYNC
+  // ============================================================
+
+  const equationOcrTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(
+      null,
+    );
+  const strokeSyncTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(
+      null,
+    );
+
+  const syncStrokesToBackend = useCallback(
+    (
+      elements:
+        readonly OrderedExcalidrawElement[],
+    ) => {
+      if (strokeSyncTimerRef.current) {
+        clearTimeout(
+          strokeSyncTimerRef.current,
+        );
+      }
+
+      const snapshot = [...elements];
+
+      strokeSyncTimerRef.current =
+        setTimeout(async () => {
+          const strokes = snapshot
+            .filter(
+              (element) =>
+                element.type === "freedraw",
+            )
+            .map((element) => ({
+              stroke_id: element.id,
+
+              created_by_ip:
+                element.customData
+                  ?.createdByIp ??
+                null,
+
+              x: element.x,
+              y: element.y,
+
+              width: element.width,
+              height: element.height,
+
+              points:
+                element.points.map(
+                  (point) =>
+                    Array.from(point),
+                ),
+
+              is_deleted:
+                element.isDeleted,
+            }));
+
+          if (!strokes.length) {
+            return;
+          }
+
+          try {
+            const response = await fetch(
+              `${CHATBOT_BACKEND_URL}/api/strokes/sync`,
+              {
+                method: "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+
+                body: JSON.stringify({
+                  strokes,
+                }),
+              },
+            );
+
+            if (!response.ok) {
+              throw new Error(
+                `Stroke sync failed: ${response.status}`,
+              );
+            }
+
+            console.log(
+              "[Stroke Sync]",
+              `${strokes.length} stroke(s) saved`,
+            );
+            scheduleEquationOcr();
+            
+          } catch (error) {
+            console.error(
+              "[Stroke Sync] Failed:",
+              error,
+            );
+          }
+        }, 500);
+    },
+    [scheduleEquationOcr],
+  );
+
+  useEffect(() => {
+    const script = document.createElement("script");
+
+    script.type = "module";
+    script.src = CHATBOT_WIDGET_SRC;
+      
+
+    document.body.appendChild(script);
+
+    return () => {
+      script.remove();
+    };
+  }, []);
+
+/**
+   * EN:
+   * Expose the minimum Excalidraw functionality required by the
+   * external chatbot. The chatbot can read the current scene and
+   * export selected elements as a PNG image.
+   *
+   * VI:
+   * Cung cấp các chức năng Excalidraw tối thiểu mà chatbot bên ngoài
+   * cần sử dụng. Chatbot có thể đọc scene hiện tại và export các
+   * element được chọn thành ảnh PNG.
+   */
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+
+    const bridge = {
+      /**
+       * EN:
+       * Return the current non-deleted Excalidraw elements.
+       *
+       * VI:
+       * Trả về các element hiện tại trên Excalidraw chưa bị xóa.
+       */
+      getScene() {
+        return {
+          elements: excalidrawAPI.getSceneElements(),
+        };
+      },
+
+      async exportWhiteboardToPng() {
+        const elements =
+          excalidrawAPI.getSceneElements();
+
+        if (!elements.length) {
+          return null;
+        }
+
+        return await exportToBlob({
+          elements,
+
+          appState: {
+            ...excalidrawAPI.getAppState(),
+            exportBackground: true,
+            exportWithDarkMode: false,
+            viewBackgroundColor: "#ffffff",
+          },
+
+          files: excalidrawAPI.getFiles(),
+
+          mimeType: "image/png",
+        });
+      },
+
+      /**
+       * EN:
+       * Export a selected group of Excalidraw elements as a PNG Blob.
+       *
+       * VI:
+       * Export một nhóm Excalidraw element được chọn thành PNG Blob.
+       */
+      async exportElementsToPng(elementIds: string[]) {
+        const idSet = new Set(elementIds);
+
+        const elements = excalidrawAPI
+          .getSceneElements()
+          .filter((element) => idSet.has(element.id));
+
+        if (!elements.length) {
+          return null;
+        }
+
+        return await exportToBlob({
+          elements,
+          appState: {
+            ...excalidrawAPI.getAppState(),
+            exportBackground: true,
+            exportWithDarkMode: false,
+            viewBackgroundColor: "#ffffff",
+          },
+          files: excalidrawAPI.getFiles(),
+          mimeType: "image/png",
+        });
+      },
+    };
+
+    (window as any).__excalidrawChatbotBridge = bridge;
+
+    return () => {
+      if ((window as any).__excalidrawChatbotBridge === bridge) {
+        delete (window as any).__excalidrawChatbotBridge;
+      }
+    };
+  }, [excalidrawAPI]);
 
   const [errorMessage, setErrorMessage] = useState("");
   const isCollabDisabled = isRunningInIframe();
@@ -410,6 +933,119 @@ const ExcalidrawWrapper = () => {
   const [isCollaborating] = useAtomWithInitialValue(isCollaboratingAtom, () => {
     return isCollaborationLink(window.location.href);
   });
+
+  // ============================================================
+  // ROOM PRESENCE
+  // ============================================================
+
+  const presenceSessionIdRef =
+    useRef<string | null>(null);
+
+  useEffect(() => {
+    // Only track presence while the user
+    // is actually inside a collaboration room.
+    if (!isCollaborating) {
+      return;
+    }
+
+    const sessionId =
+      crypto.randomUUID();
+
+    presenceSessionIdRef.current =
+      sessionId;
+
+    console.log(
+      "[Presence] Session ID:",
+      sessionId,
+    );
+
+    const joinRoom = async () => {
+      try {
+        const response = await fetch(
+          `${CHATBOT_BACKEND_URL}/api/presence/join?session_id=${encodeURIComponent(
+            sessionId,
+          )}`,
+          {
+            method: "POST",
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Presence join failed: ${response.status}`,
+          );
+        }
+
+        const result =
+          await response.json();
+
+        console.log(
+          "[Presence] Joined:",
+          result,
+        );
+      } catch (error) {
+        console.error(
+          "[Presence] Join failed:",
+          error,
+        );
+      }
+    };
+
+
+    const sendHeartbeat =
+      async () => {
+        try {
+          const response = await fetch(
+            `${CHATBOT_BACKEND_URL}/api/presence/heartbeat?session_id=${encodeURIComponent(
+              sessionId,
+            )}`,
+            {
+              method: "POST",
+            },
+          );
+
+          if (!response.ok) {
+            throw new Error(
+              `Presence heartbeat failed: ${response.status}`,
+            );
+          }
+
+          console.log(
+            "[Presence] Heartbeat:",
+            sessionId,
+          );
+        } catch (error) {
+          console.error(
+            "[Presence] Heartbeat failed:",
+            error,
+          );
+        }
+      };
+
+
+    // JOIN immediately
+    void joinRoom();
+
+
+    // HEARTBEAT every 10 seconds
+    const heartbeatTimer =
+      window.setInterval(
+        () => {
+          void sendHeartbeat();
+        },
+        10000,
+      );
+
+
+    return () => {
+      window.clearInterval(
+        heartbeatTimer,
+      );
+
+      presenceSessionIdRef.current =
+        null;
+    };
+  }, [isCollaborating]);
   const collabError = useAtomValue(collabErrorIndicatorAtom);
   const userToFollow = useAtomValue(userToFollowAtom);
 
@@ -712,57 +1348,193 @@ const ExcalidrawWrapper = () => {
     };
   }, [excalidrawAPI]);
 
+
+
   const onChange = (
-    elements: readonly OrderedExcalidrawElement[],
+    elements:
+      readonly OrderedExcalidrawElement[],
     appState: AppState,
     files: BinaryFiles,
   ) => {
-    if (collabAPI?.isCollaborating()) {
-      collabAPI.syncElements(elements);
+    const publicIPv4 =
+      (window as any)
+        .__chatbotPublicIPv4 as
+        | string
+        | undefined;
+
+    let nextElements = elements;
+    let didTagStroke = false;
+
+
+    // ============================================================
+    // 1. TRACK LOCAL FREEDRAW WHILE DRAWING
+    // ============================================================
+
+    if (
+      publicIPv4 &&
+      appState.newElement?.type ===
+        "freedraw"
+    ) {
+      localFreedrawIdsRef.current.add(
+        appState.newElement.id,
+      );
     }
 
-    // this check is redundant, but since this is a hot path, it's best
-    // not to evaludate the nested expression every time
-    if (!LocalData.isSavePaused()) {
-      LocalData.save(elements, appState, files, () => {
-        if (excalidrawAPI) {
-          let didChange = false;
 
-          const elements = excalidrawAPI
-            .getSceneElementsIncludingDeleted()
-            .map((element) => {
-              if (
-                LocalData.fileStorage.shouldUpdateImageElementStatus(element)
-              ) {
-                const newElement = newElementWith(element, { status: "saved" });
-                if (newElement !== element) {
-                  didChange = true;
-                }
-                return newElement;
-              }
-              return element;
-            });
+    // ============================================================
+    // 2. TAG FINISHED LOCAL STROKE WITH IP
+    // ============================================================
 
-          if (didChange) {
-            excalidrawAPI.updateScene({
-              elements,
-              captureUpdate: CaptureUpdateAction.NEVER,
-            });
+    if (
+      publicIPv4 &&
+      !appState.newElement &&
+      localFreedrawIdsRef.current.size > 0
+    ) {
+      nextElements = elements.map(
+        (element) => {
+          if (
+            element.type !==
+              "freedraw" ||
+            !localFreedrawIdsRef.current.has(
+              element.id,
+            ) ||
+            element.customData
+              ?.createdByIp
+          ) {
+            return element;
           }
-        }
-      });
+
+          didTagStroke = true;
+
+          localFreedrawIdsRef.current.delete(
+            element.id,
+          );
+
+          return newElementWith(
+            element,
+            {
+              customData: {
+                ...element.customData,
+
+                createdByIp:
+                  publicIPv4,
+              },
+            },
+          );
+        },
+      );
+
+      if (
+        didTagStroke &&
+        excalidrawAPI
+      ) {
+        excalidrawAPI.updateScene({
+          elements: nextElements,
+
+          captureUpdate:
+            CaptureUpdateAction.NEVER,
+        });
+      }
     }
 
-    // Render the debug scene if the debug canvas is available
-    if (debugCanvasRef.current && excalidrawAPI) {
+
+    // ============================================================
+    // 3. SYNC ELEMENTS TO LIVE COLLABORATION
+    // ============================================================
+
+    if (
+      collabAPI?.isCollaborating()
+    ) {
+      collabAPI.syncElements(
+        nextElements,
+      );
+    }
+
+
+    // ============================================================
+    // 4. SAVE FINISHED STROKES TO strokes.json
+    // ============================================================
+
+    if (!appState.newElement) {
+      syncStrokesToBackend(
+        nextElements,
+      );
+    }
+
+
+    // ============================================================
+    // 5. EXISTING LOCAL EXCALIDRAW SAVE
+    // ============================================================
+
+    if (!LocalData.isSavePaused()) {
+      LocalData.save(
+        nextElements,
+        appState,
+        files,
+        () => {
+          if (excalidrawAPI) {
+            let didChange = false;
+
+            const savedElements =
+              excalidrawAPI
+                .getSceneElementsIncludingDeleted()
+                .map((element) => {
+                  if (
+                    LocalData.fileStorage
+                      .shouldUpdateImageElementStatus(
+                        element,
+                      )
+                  ) {
+                    const newElement =
+                      newElementWith(
+                        element,
+                        {
+                          status:
+                            "saved",
+                        },
+                      );
+
+                    if (
+                      newElement !==
+                      element
+                    ) {
+                      didChange = true;
+                    }
+
+                    return newElement;
+                  }
+
+                  return element;
+                });
+
+            if (didChange) {
+              excalidrawAPI.updateScene({
+                elements:
+                  savedElements,
+
+                captureUpdate:
+                  CaptureUpdateAction.NEVER,
+              });
+            }
+          }
+        },
+      );
+    }
+
+
+    if (
+      debugCanvasRef.current &&
+      excalidrawAPI
+    ) {
       debugRenderer(
         debugCanvasRef.current,
         appState,
-        elements,
+        nextElements,
         window.devicePixelRatio,
       );
     }
   };
+
 
   const [latestShareableLink, setLatestShareableLink] = useState<string | null>(
     null,

@@ -15,8 +15,66 @@ export default defineConfig(({ mode }) => {
   return {
     server: {
       port: Number(envVars.VITE_APP_PORT || 3000),
-      // open the browser
       open: true,
+
+      fs: {
+        allow: [
+          path.resolve(__dirname, ".."),
+          "/home/student/chuynh/Chatbot/widget/src",
+        ],
+      },
+
+      proxy: {
+        // ============================================================
+        // Existing chatbot proxy
+        // ============================================================
+
+        "/chatbot-api": {
+          target: "http://10.255.0.11:65532",
+          changeOrigin: true,
+
+          rewrite: (requestPath) => {
+            if (
+              requestPath ===
+              "/chatbot-api/health"
+            ) {
+              return "/health";
+            }
+
+            return requestPath.replace(
+              /^\/chatbot-api/,
+              "/api",
+            );
+          },
+        },
+
+
+        // ============================================================
+        // FastAPI backend
+        // ============================================================
+
+        "/api": {
+          target:
+            "http://10.255.0.11:65532",
+
+          changeOrigin: true,
+        },
+
+
+        // ============================================================
+        // Excalidraw collaboration server
+        // Socket.IO
+        // ============================================================
+
+        "/socket.io": {
+          target:
+            "http://10.255.0.11:65534",
+
+          changeOrigin: true,
+
+          ws: true,
+        },
+      },
     },
     // We need to specify the envDir since now there are no
     //more located in parallel with the vite.config.ts file but in parent dir
