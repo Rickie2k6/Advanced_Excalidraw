@@ -43,6 +43,10 @@ import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
 import { t } from "@excalidraw/excalidraw/i18n";
 
 import {
+  isFreeDrawElement,
+} from "@excalidraw/element";
+
+import {
   GithubIcon,
   XBrandIcon,
   DiscordIcon,
@@ -716,38 +720,41 @@ useEffect(() => {
 
       strokeSyncTimerRef.current =
         setTimeout(async () => {
-          const strokes = snapshot
-            .filter(
-              (element) =>
-                element.type === "freedraw",
-            )
-            .map((element) => ({
-              stroke_id: element.id,
+          const strokes = snapshot.flatMap(
+            (element) => {
+              if (
+                element.type !== "freedraw" ||
+                element.isDeleted
+              ) {
+                return [];
+              }
 
-              created_by_ip:
-                element.customData
-                  ?.createdByIp ??
-                null,
+              return [
+                {
+                  stroke_id: element.id,
 
-              x: element.x,
-              y: element.y,
+                  created_by_ip:
+                    element.customData
+                      ?.createdByIp ??
+                    null,
 
-              width: element.width,
-              height: element.height,
+                  x: element.x,
+                  y: element.y,
 
-              points:
-                element.points.map(
-                  (point) =>
-                    Array.from(point),
-                ),
+                  width: element.width,
+                  height: element.height,
 
-              is_deleted:
-                element.isDeleted,
-            }));
+                  points:
+                    element.points.map(
+                      (point) =>
+                        Array.from(point),
+                    ),
 
-          if (!strokes.length) {
-            return;
-          }
+                  is_deleted: false,
+                },
+              ];
+            },
+          );
 
           try {
             const response = await fetch(
@@ -776,7 +783,9 @@ useEffect(() => {
               "[Stroke Sync]",
               `${strokes.length} stroke(s) saved`,
             );
-            scheduleEquationOcr();
+            if (strokes.length > 0) {
+              scheduleEquationOcr();
+            }
             
           } catch (error) {
             console.error(
