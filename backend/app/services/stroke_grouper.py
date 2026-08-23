@@ -27,6 +27,7 @@ class StrokeBox:
     height: float
 
     created_by_ip: str | None = None
+    contributor_id: str | None = None
 
     @property
     def left(self) -> float:
@@ -250,6 +251,12 @@ def _parse_strokes(
 
                 height=float(
                     record["height"]
+                ),
+
+                contributor_id=(
+                    record.get(
+                        "contributor_id"
+                    )
                 ),
 
                 created_by_ip=(
@@ -660,9 +667,15 @@ def group_freedraw_strokes(
 
         contributors = sorted(
             {
-                stroke.created_by_ip
+                (
+                    stroke.contributor_id
+                    or stroke.created_by_ip
+                )
                 for stroke in group
-                if stroke.created_by_ip
+                if (
+                    stroke.contributor_id
+                    or stroke.created_by_ip
+                )
             }
         )
 

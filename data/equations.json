@@ -1,100 +1,74 @@
 {
-  "updated_at": "2026-08-23T16:51:02.224438+00:00",
+  "updated_at": "2026-08-23T18:03:11.806075+00:00",
   "equations": {
-    "eq_9a0a335718d2": {
-      "equation_id": "eq_9a0a335718d2",
-      "equation": "2x=0",
-      "stroke_ids": [
-        "d2pUboyOeLSxVoweW2kCi",
-        "llYAD1UbXq727m_Gpk-H9",
-        "-AZChtzojM4jM-E8AHM3l",
-        "lXLi-wrlwEXYJL60DeF1w",
-        "5bokUi05O0ua6yNXz-A3q",
-        "hKRcguuCmeXmaBiqaIo1C"
-      ],
-      "bbox": {
-        "x": 1076.2578125,
-        "y": 200.453125,
-        "width": 199.95703125,
-        "height": 50.38671875
-      },
-      "contributors": [
-        "104.222.26.113"
-      ],
-      "confidence": null,
-      "updated_at": "2026-08-23T16:51:01.547411+00:00"
-    },
-    "eq_e6a83c56f123": {
-      "equation_id": "eq_e6a83c56f123",
-      "equation": "3x+1=0",
-      "stroke_ids": [
-        "xhD24tHrKtIehRrepBPyu",
-        "C5KOL_sSWQuQWcWdZbhxN",
-        "7Qc8AiVlApT8ypgm2nAQN",
-        "VYZToBTFRapwkHyyoRQxd",
-        "hqw1ULC6c3wFcoWSY3qqn",
-        "I1RDSbNe-udKStxrEENDz",
-        "LaRCWmt18bozWiiNv7uqn",
-        "sbyjrtLA4Sg1WVXRnGeQJ",
-        "NSObQjgai9uGYbYJU5j0Y"
-      ],
-      "bbox": {
-        "x": 654.71484375,
-        "y": 322.23046875,
-        "width": 294.50390625,
-        "height": 95.1953125
-      },
-      "contributors": [
-        "104.222.26.113"
-      ],
-      "confidence": null,
-      "updated_at": "2026-08-23T16:51:01.547411+00:00"
-    },
-    "eq_e8fc444bbe70": {
-      "equation_id": "eq_e8fc444bbe70",
-      "equation": "3x=-1",
-      "stroke_ids": [
-        "WhNZo0kF8JqiOFTTqw8aY",
-        "U_4E_BVA5GEEb_mPGPBKI",
-        "0YC13IWeg2YWCmtmUyRiB",
-        "TgtmoYHjozb2ET-HTNn9j",
-        "2Zg90PWuL1qaQyKJ3GrZq",
-        "GHEpLyRAP6YF1GL2jlQdn",
-        "-5W7faBgHboVt-jRn6gww"
-      ],
-      "bbox": {
-        "x": 666.484375,
-        "y": 468.29296875,
-        "width": 122.890625,
-        "height": 81.65234375
-      },
-      "contributors": [
-        "104.222.26.113"
-      ],
-      "confidence": null,
-      "updated_at": "2026-08-23T16:51:01.547411+00:00"
-    },
-    "eq_0fe1a7c0a849": {
-      "equation_id": "eq_0fe1a7c0a849",
+    "eq_dce6946b150f": {
+      "equation_id": "eq_dce6946b150f",
       "equation": "x=0",
       "stroke_ids": [
-        "7XprctOH_8puTdUZAYjFB",
-        "ZqOijk5ggKPmvoEVDC4YU",
-        "lUwOGPCwxxsqxg20a3guU",
-        "WP036F0FdD8oCzLXzHw7o",
-        "hxxOSqbfs8hlsASzq4bFX"
+        "s3gR1b5i2Es7pZi3ysFK3",
+        "EIQowmm13gjX-Hg5MICD3",
+        "Kj0pcx-Hz7PN145z0RQoZ",
+        "QyFrp__-jj-ZdKZNx7grz",
+        "I1mfj2VtphJ4KJS-9gA3T"
       ],
       "bbox": {
-        "x": 1048.90625,
-        "y": 494.55859375,
-        "width": 120.43359375,
-        "height": 24.53125
+        "x": 675.3603515625,
+        "y": -137.6318359375,
+        "width": 65.43359375,
+        "height": 18.22265625
       },
       "contributors": [
-        "104.222.26.113"
+        "68c6fb3c-b7ff-4f20-ba1d-ffe0f626ecd5"
       ],
       "confidence": null,
-      "updated_at": "2026-08-23T16:51:01.547411+00:00"
+      "updated_at": "2026-08-23T18:03:10.825825+00:00"
+    },
+    "eq_7613561f0618": {
+      "equation_id": "eq_7613561f0618",
+      "equation": "\\begin{array}{c} x=1 \\\\ x=5 \\end{array}",
+      "stroke_ids": [
+        "XpZkGIpJJIlH7mPo2xbAZ",
+        "FWAuwJfneMwrvhrB4qnMw",
+        "AFARvj89BO4RuLGvf_ELu",
+        "S-S8Ncm_fW_CP3CN0bACq",
+        "S_a9nALwC0K6_CblsRXEo",
+        "MxplYd-E0YWB4SzGG9McH",
+        "cEWzvhbO5FQAmbFbYqwAs",
+        "WaUc3ckSCwpiyE6DKAxM0",
+        "8uPGAC1561PfPNd6z7xlg",
+        "MwByzCoI5XQxezYMf8Yvw",
+        "DN_zLatK4Npi2bXa2FFz2"
+      ],
+      "bbox": {
+        "x": 683.5426432291666,
+        "y": -37.7998046875,
+        "width": 138.33333333333337,
+        "height": 134.3203124999999
+      },
+      "contributors": [
+        "68c6fb3c-b7ff-4f20-ba1d-ffe0f626ecd5",
+        "7c7564a1-c0ec-4082-b34f-e58ecf9829d3"
+      ],
+      "confidence": null,
+      "updated_at": "2026-08-23T18:03:10.825825+00:00"
+    },
+    "eq_13d2f321f12d": {
+      "equation_id": "eq_13d2f321f12d",
+      "equation": "\\bullet",
+      "stroke_ids": [
+        "QlrV-0JQPR_sANfpYRJfr"
+      ],
+      "bbox": {
+        "x": 1017.5908203125,
+        "y": -12.9326171875,
+        "width": 9.999999997489795e-05,
+        "height": 9.999999999976694e-05
+      },
+      "contributors": [
+        "68c6fb3c-b7ff-4f20-ba1d-ffe0f626ecd5"
+      ],
+      "confidence": null,
+      "updated_at": "2026-08-23T18:03:10.825825+00:00"
     }
   }
 }

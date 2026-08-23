@@ -174,7 +174,10 @@ def get_contributors(
     strokes: dict,
 ) -> list[str]:
     """
-    Resolve contributor IPs from strokes.json.
+    Resolve contributors from strokes.json.
+
+    Prefer contributor_id.
+    Fall back to IP for legacy strokes.
     """
 
     contributors = set()
@@ -187,12 +190,23 @@ def get_contributors(
         if not stroke:
             continue
 
-        ip = stroke.get(
+        contributor_id = stroke.get(
+            "contributor_id"
+        )
+
+        created_by_ip = stroke.get(
             "created_by_ip"
         )
 
-        if ip:
-            contributors.add(ip)
+        contributor = (
+            contributor_id
+            or created_by_ip
+        )
+
+        if contributor:
+            contributors.add(
+                contributor
+            )
 
     return sorted(
         contributors

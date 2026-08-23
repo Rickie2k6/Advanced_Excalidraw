@@ -29,6 +29,7 @@ file_lock = asyncio.Lock()
 class StrokeRecord(BaseModel):
     stroke_id: str
 
+    contributor_id: str | None = None
     created_by_ip: str | None = None
 
     x: float
