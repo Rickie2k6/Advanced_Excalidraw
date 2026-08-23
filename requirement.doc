@@ -1,0 +1,17 @@
+# Backend dependencies
+# Install with: python -m pip install -r requirement.doc
+
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+httpx
+openai
+numpy
+pillow<12
+sympy
+
+# PaddleOCR-VL and its model runtime
+paddleocr[doc-parser]
+transformers>=5.0.0
+accelerate
