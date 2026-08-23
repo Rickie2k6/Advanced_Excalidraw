@@ -456,9 +456,34 @@ type HintViewport = {
   offsetLeft: number;
   offsetTop: number;
 };
+
+const getOrCreateContributorId = () => {
+  const storageKey =
+    "excalidraw_contributor_id";
+
+  let contributorId =
+    localStorage.getItem(storageKey);
+
+  if (!contributorId) {
+    contributorId =
+      crypto.randomUUID();
+
+    localStorage.setItem(
+      storageKey,
+      contributorId,
+    );
+  }
+
+  return contributorId;
+};
 // gọi chatbot-widget.js
 const ExcalidrawWrapper = () => {
   const excalidrawAPI = useExcalidrawAPI();
+
+  const contributorIdRef =
+    useRef(
+      getOrCreateContributorId(),
+    );
   // ============================================================
   // WHITEBOARD TUTOR HINTS
   // ============================================================
@@ -830,6 +855,11 @@ useEffect(() => {
                 {
                   stroke_id: element.id,
 
+                  contributor_id:
+                    element.customData
+                      ?.createdByContributorId ??
+                    null,
+
                   created_by_ip:
                     element.customData
                       ?.createdByIp ??
@@ -848,7 +878,7 @@ useEffect(() => {
                     ),
 
                   is_deleted: false,
-                },
+                }
               ];
             },
           );
@@ -1492,6 +1522,9 @@ useEffect(() => {
         .__chatbotPublicIPv4 as
         | string
         | undefined;
+    
+    const contributorId =
+      contributorIdRef.current;
 
     let nextElements = elements;
     let didTagStroke = false;
@@ -1502,7 +1535,6 @@ useEffect(() => {
     // ============================================================
 
     if (
-      publicIPv4 &&
       appState.newElement?.type ===
         "freedraw"
     ) {
@@ -1517,7 +1549,6 @@ useEffect(() => {
     // ============================================================
 
     if (
-      publicIPv4 &&
       !appState.newElement &&
       localFreedrawIdsRef.current.size > 0
     ) {
@@ -1530,7 +1561,7 @@ useEffect(() => {
               element.id,
             ) ||
             element.customData
-              ?.createdByIp
+              ?.createdByContributorId
           ) {
             return element;
           }
@@ -1547,8 +1578,15 @@ useEffect(() => {
               customData: {
                 ...element.customData,
 
-                createdByIp:
-                  publicIPv4,
+                createdByContributorId:
+                  contributorId,
+
+                ...(publicIPv4
+                  ? {
+                      createdByIp:
+                        publicIPv4,
+                    }
+                  : {}),
               },
             },
           );
