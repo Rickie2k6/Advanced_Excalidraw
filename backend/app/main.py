@@ -1,3 +1,4 @@
+from app.api.whiteboard import router as whiteboard_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
@@ -71,7 +72,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+app.include_router(whiteboard_router)
 
 app.include_router(
     health.router,

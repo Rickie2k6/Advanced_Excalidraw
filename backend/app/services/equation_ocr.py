@@ -5,6 +5,7 @@ from typing import Any
 
 from PIL import (
     Image,
+    ImageOps,
     UnidentifiedImageError,
 )
 
@@ -48,6 +49,53 @@ def _image_from_bytes(
             "Invalid equation image."
         ) from error
 
+def _prepare_equation_image(
+    image: Image.Image,
+) -> Image.Image:
+    """
+    Improve handwritten equation recognition
+    before sending the image to PaddleOCR-VL.
+
+    - enlarge small handwriting
+    - normalize contrast
+    - add white padding around the equation
+    """
+
+    image = image.convert("RGB")
+
+    # ----------------------------------------
+    # 1. Upscale image.
+    # Paddle receives clearer stroke geometry.
+    # ----------------------------------------
+    scale = 3
+
+    image = image.resize(
+        (
+            image.width * scale,
+            image.height * scale,
+        ),
+        Image.Resampling.LANCZOS,
+    )
+
+    # ----------------------------------------
+    # 2. Normalize contrast.
+    # ----------------------------------------
+    image = ImageOps.autocontrast(
+        image,
+    )
+
+    # ----------------------------------------
+    # 3. Add white space around handwriting.
+    # Helps prevent symbols near crop borders
+    # from being confused.
+    # ----------------------------------------
+    image = ImageOps.expand(
+        image,
+        border=40,
+        fill="white",
+    )
+
+    return image
 
 def _bbox_to_list(
     bbox: dict[str, Any],
@@ -103,6 +151,10 @@ def recognize_equation(
 
     image = _image_from_bytes(
         image_bytes
+    )
+
+    image = _prepare_equation_image(
+        image
     )
 
     bbox_list = _bbox_to_list(
