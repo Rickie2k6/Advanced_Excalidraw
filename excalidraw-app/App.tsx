@@ -419,9 +419,101 @@ type EquationGroupResponse = {
   count: number;
   equations: Record<string, EquationGroup>;
 };
+
+
+type WhiteboardHint = {
+  anchor_equation_id: string;
+  equation: string;
+
+  bbox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
+
+  next_step: {
+    valid: boolean;
+    status: string;
+    operation: string | null;
+    value: string | null;
+    goal: string | null;
+  };
+
+  instruction: string;
+};
+
+type WhiteboardHintsResponse = {
+  success: boolean;
+  equation_count: number;
+  hints: WhiteboardHint[];
+};
+
+type HintViewport = {
+  scrollX: number;
+  scrollY: number;
+  zoom: number;
+  offsetLeft: number;
+  offsetTop: number;
+};
 // gọi chatbot-widget.js
 const ExcalidrawWrapper = () => {
   const excalidrawAPI = useExcalidrawAPI();
+  // ============================================================
+  // WHITEBOARD TUTOR HINTS
+  // ============================================================
+
+  const hintOverlayRootRef =
+    useRef<HTMLDivElement>(null);
+
+  const [whiteboardHints, setWhiteboardHints] =
+    useState<WhiteboardHint[]>([]);
+
+  const [hintViewport, setHintViewport] =
+    useState<HintViewport>({
+      scrollX: 0,
+      scrollY: 0,
+      zoom: 1,
+      offsetLeft: 0,
+      offsetTop: 0,
+    });
+
+  const refreshWhiteboardHints =
+    useCallback(async () => {
+      try {
+        const response = await fetch(
+          `${CHATBOT_BACKEND_URL}/api/whiteboard/hints`,
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Whiteboard hints failed: ${response.status}`,
+          );
+        }
+
+        const data =
+          (await response.json()) as WhiteboardHintsResponse;
+
+        setWhiteboardHints(
+          data.hints ?? [],
+        );
+
+        console.log(
+          "[Whiteboard Hints]",
+          data.hints,
+        );
+      } catch (error) {
+        console.error(
+          "[Whiteboard Hints] Failed:",
+          error,
+        );
+      }
+    }, []);
+
+  // Load existing hints when app opens.
+  useEffect(() => {
+    void refreshWhiteboardHints();
+  }, [refreshWhiteboardHints]);
 
 useEffect(() => {
   const initializePublicIPv4 = async () => {
@@ -661,6 +753,11 @@ useEffect(() => {
               ocrResult.equation,
             );
           }
+          // --------------------------------------------
+          // 5. Refresh tutoring hints after OCR
+          // --------------------------------------------
+          await refreshWhiteboardHints();
+
         } while (
           equationPipelinePendingRef.current
         );
@@ -673,7 +770,7 @@ useEffect(() => {
         equationPipelineRunningRef.current =
           false;
       }
-    }, [excalidrawAPI]);
+    }, [excalidrawAPI, refreshWhiteboardHints]);
 
 
   const scheduleEquationOcr =
@@ -1365,6 +1462,31 @@ useEffect(() => {
     appState: AppState,
     files: BinaryFiles,
   ) => {
+    // ============================================================
+    // UPDATE WHITEBOARD HINT VIEWPORT
+    // ============================================================
+
+    const nextHintViewport: HintViewport = {
+      scrollX: appState.scrollX,
+      scrollY: appState.scrollY,
+      zoom: Number(appState.zoom?.value ?? 1),
+      offsetLeft: appState.offsetLeft ?? 0,
+      offsetTop: appState.offsetTop ?? 0,
+    };
+
+    setHintViewport((previous) => {
+      if (
+        previous.scrollX === nextHintViewport.scrollX &&
+        previous.scrollY === nextHintViewport.scrollY &&
+        previous.zoom === nextHintViewport.zoom &&
+        previous.offsetLeft === nextHintViewport.offsetLeft &&
+        previous.offsetTop === nextHintViewport.offsetTop
+      ) {
+        return previous;
+      }
+
+      return nextHintViewport;
+    });
     const publicIPv4 =
       (window as any)
         .__chatbotPublicIPv4 as
@@ -1721,7 +1843,11 @@ useEffect(() => {
 
   return (
     <div
-      style={{ height: "100%" }}
+      ref={hintOverlayRootRef}
+      style={{
+        height: "100%",
+        position: "relative",
+      }}
       className={clsx("excalidraw-app", {
         "is-collaborating": isCollaborating,
       })}
@@ -2077,7 +2203,107 @@ useEffect(() => {
             ref={debugCanvasRef}
           />
         )}
+      
       </Excalidraw>
+
+      {/* =======================================================
+          WHITEBOARD TUTOR HINT OVERLAY
+          ======================================================= */}
+
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          overflow: "hidden",
+          zIndex: 20,
+        }}
+      >
+        {whiteboardHints.map((hint) => {
+          if (!hint.bbox) {
+            return null;
+          }
+
+          const zoom = hintViewport.zoom;
+
+          const wrapperRect =
+            hintOverlayRootRef.current?.getBoundingClientRect();
+
+          const wrapperLeft =
+            wrapperRect?.left ?? 0;
+
+          const wrapperTop =
+            wrapperRect?.top ?? 0;
+
+          // Convert scene coordinates -> screen coordinates
+          const equationCenterX =
+            (
+              hint.bbox.x +
+              hint.bbox.width / 2 +
+              hintViewport.scrollX
+            ) *
+              zoom +
+            hintViewport.offsetLeft -
+            wrapperLeft;
+
+          const equationTopY =
+            (
+              hint.bbox.y +
+              hintViewport.scrollY
+            ) *
+              zoom +
+            hintViewport.offsetTop -
+            wrapperTop;
+
+          return (
+            <div
+              key={hint.anchor_equation_id}
+              style={{
+                position: "absolute",
+
+                left: equationCenterX,
+                top: equationTopY - 12,
+
+                transform:
+                  "translate(-50%, -100%)",
+
+                maxWidth: 280,
+                minWidth: 160,
+
+                padding: "10px 12px",
+
+                borderRadius: 10,
+
+                background:
+                  "rgba(255,255,255,0.97)",
+
+                border:
+                  "1px solid rgba(0,0,0,0.14)",
+
+                boxShadow:
+                  "0 4px 16px rgba(0,0,0,0.16)",
+
+                fontSize: 13,
+                lineHeight: 1.4,
+
+                textAlign: "left",
+
+                pointerEvents: "none",
+              }}
+            >
+              <strong>💡 Hint</strong>
+
+              <div
+                style={{
+                  marginTop: 4,
+                }}
+              >
+                {hint.instruction}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
