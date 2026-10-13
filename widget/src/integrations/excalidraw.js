@@ -22,6 +22,54 @@ export function getExcalidrawScene() {
 }
 
 
+export function addEllipse({
+  x,
+  y,
+  width,
+  height,
+}) {
+  const bridge = getBridge();
+
+  if (
+    typeof bridge.addEllipse !== "function"
+  ) {
+    throw new Error(
+      "Excalidraw bridge does not support addEllipse.",
+    );
+  }
+
+  return bridge.addEllipse({
+    x,
+    y,
+    width,
+    height,
+  });
+}
+
+
+export function writeMath({
+  expression,
+  x,
+  y,
+}) {
+  const bridge = getBridge();
+
+  if (
+    typeof bridge.writeMath !== "function"
+  ) {
+    throw new Error(
+      "Excalidraw bridge does not support writeMath.",
+    );
+  }
+
+  return bridge.writeMath({
+    expression,
+    x,
+    y,
+  });
+}
+
+
 export async function getEquationContext() {
   const bridge = getBridge();
 

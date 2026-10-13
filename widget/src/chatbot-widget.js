@@ -15,11 +15,6 @@ import {
   sendMessage,
 } from "./ui/chat/messages.js";
 
-import {
-  getConfirmedPublicIPv4,
-} from "./network/public-ip.js";
-
-
 (function () {
   // Prevent chatbot from being initialized twice
   if (window.__aiccChatbotInitialized) {

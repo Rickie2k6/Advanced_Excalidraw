@@ -35,7 +35,7 @@ export function createHeader() {
 
     const title = document.createElement('div');
     title.className = 'aicc-chat-title';
-    title.textContent = 'AI Course Companion';
+    title.textContent = 'Jarvis';
 
     const subtitle = document.createElement('div');
     subtitle.className = 'aicc-chat-subtitle';

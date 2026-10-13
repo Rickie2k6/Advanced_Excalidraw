@@ -1,8 +1,15 @@
 import json
 import math
 
-from app.reasoning.equation_parser import parse_equation
-from app.reasoning.relationship import detect_relationship
+from app.reasoning.equation_parser import (
+    parse_equation,
+)
+from app.reasoning.equation_validation import (
+    is_complete_equation,
+)
+from app.reasoning.relationship import (
+    detect_relationship,
+)
 
 
 def get_bbox(equation):
@@ -56,18 +63,25 @@ def spatial_score(source, target):
     # Same approximate column
     if dx < 80:
         score += 0.4
+
     elif dx < 150:
         score += 0.2
 
-    distance = math.sqrt(dx**2 + dy**2)
+    distance = math.sqrt(
+        dx**2 + dy**2
+    )
 
     # Reasonably close
     if distance < 250:
         score += 0.2
+
     elif distance < 450:
         score += 0.1
 
-    return min(score, 1.0)
+    return min(
+        score,
+        1.0,
+    )
 
 
 def get_equation_text(equation):
@@ -75,7 +89,12 @@ def get_equation_text(equation):
     Support several possible field names.
     """
 
-    for key in ("latex", "equation", "text", "recognized_text"):
+    for key in (
+        "latex",
+        "equation",
+        "text",
+        "recognized_text",
+    ):
         value = equation.get(key)
 
         if value:
@@ -99,69 +118,154 @@ def build_equation_graph(equations):
     edges = []
 
     for source in equations:
-        source_text = get_equation_text(source)
+        source_text = get_equation_text(
+            source
+        )
 
         if not source_text:
             continue
 
+        source_text = source_text.strip()
+
+        # Skip OCR groups that are not complete equations.
+        if not is_complete_equation(
+            source_text
+        ):
+            print(
+                "[graph] Skipping invalid "
+                f"equation {source.get('id')}: "
+                f"{source_text}"
+            )
+
+            continue
+
         try:
-            source_sympy = parse_equation(source_text)
+            source_sympy = parse_equation(
+                source_text
+            )
+
         except Exception as exc:
             print(
-                f"[graph] Could not parse {source.get('id')}: "
+                f"[graph] Could not parse "
+                f"{source.get('id')}: "
                 f"{source_text}: {exc}"
             )
+
             continue
 
         for target in equations:
 
-            if source.get("id") == target.get("id"):
+            if (
+                source.get("id")
+                == target.get("id")
+            ):
                 continue
 
-            target_text = get_equation_text(target)
+            target_text = get_equation_text(
+                target
+            )
 
             if not target_text:
                 continue
 
-            # If position exists, don't connect upward.
-            source_bbox = get_bbox(source)
-            target_bbox = get_bbox(target)
+            target_text = target_text.strip()
 
-            if source_bbox and target_bbox:
-                source_y = source_bbox["y"]
-                target_y = target_bbox["y"]
+            # Skip invalid target equations too.
+            if not is_complete_equation(
+                target_text
+            ):
+                continue
+
+            # If position exists,
+            # don't connect upward.
+            source_bbox = get_bbox(
+                source
+            )
+            target_bbox = get_bbox(
+                target
+            )
+
+            if (
+                source_bbox
+                and target_bbox
+            ):
+                source_y = source_bbox[
+                    "y"
+                ]
+
+                target_y = target_bbox[
+                    "y"
+                ]
 
                 if target_y <= source_y:
                     continue
 
             try:
-                target_sympy = parse_equation(target_text)
+                target_sympy = parse_equation(
+                    target_text
+                )
+
             except Exception:
                 continue
 
-            relationship = detect_relationship(
-                source_sympy,
-                target_sympy,
+            relationship = (
+                detect_relationship(
+                    source_sympy,
+                    target_sympy,
+                )
             )
 
             if not relationship["valid"]:
                 continue
 
-            spatial = spatial_score(source, target)
+            spatial = spatial_score(
+                source,
+                target,
+            )
 
             # Math validity is most important.
-            confidence = 0.8 + (0.2 * spatial)
+            confidence = (
+                0.8
+                + (0.2 * spatial)
+            )
 
             edges.append(
                 {
-                    "from": source["id"],
-                    "to": target["id"],
-                    "from_equation": source_text,
-                    "to_equation": target_text,
-                    "operation": relationship["operation"],
-                    "value": str(relationship["value"]),
-                    "spatial_score": round(spatial, 3),
-                    "confidence": round(confidence, 3),
+                    "from":
+                        source["id"],
+
+                    "to":
+                        target["id"],
+
+                    "from_equation":
+                        source_text,
+
+                    "to_equation":
+                        target_text,
+
+                    "operation":
+                        relationship[
+                            "operation"
+                        ],
+
+                    "value":
+                        str(
+                            relationship[
+                                "value"
+                            ]
+                        ),
+
+                    "spatial_score":
+                        round(
+                            spatial,
+                            3,
+                        ),
+
+                    "confidence":
+                        round(
+                            confidence,
+                            3,
+                        ),
                 }
             )
 
@@ -186,13 +290,28 @@ def load_equations(path):
     }
     """
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(
+        path,
+        "r",
+        encoding="utf-8",
+    ) as f:
         data = json.load(f)
 
-    if isinstance(data, list):
+    if isinstance(
+        data,
+        list,
+    ):
         return data
 
-    if isinstance(data, dict):
-        return data.get("equations", [])
+    if isinstance(
+        data,
+        dict,
+    ):
+        return data.get(
+            "equations",
+            [],
+        )
 
-    raise ValueError("Unsupported equations.json format")
+    raise ValueError(
+        "Unsupported equations.json format"
+    )

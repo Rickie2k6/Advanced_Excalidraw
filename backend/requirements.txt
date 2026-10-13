@@ -2,8 +2,11 @@ fastapi
 uvicorn[standard]
 python-multipart
 python-dotenv
+httpx
+openai
 numpy
 pillow<12
+sympy
 
 paddleocr[doc-parser]
 

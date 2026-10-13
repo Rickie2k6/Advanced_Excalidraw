@@ -67,13 +67,14 @@ On Windows, activate the environment with:
 .venv\Scripts\activate
 ```
 
-Install all backend packages from `requirement.doc`:
+Install all backend packages from the canonical dependency file:
 
 ```bash
-python -m pip install -r requirement.doc
+python -m pip install -r backend/requirements.txt
 ```
 
-Although the dependency file uses the requested `.doc` extension, it is a plain-text, pip-compatible requirements file.
+`requirement.doc` remains a pip-compatible entry point that includes
+`backend/requirements.txt`, so the previous installation command still works.
 
 ### Configure and start the server
 

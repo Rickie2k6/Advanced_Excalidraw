@@ -40,17 +40,6 @@ function getFloatingGeometry(container) {
     };
 }
 
-function readCurrentGeometry(container) {
-    const rect = container.getBoundingClientRect();
-
-    return {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height
-    };
-}
-
 function expandWidget(container, maximizeBtn, interactions) {
     if (container.classList.contains("aicc-is-expanded")) {
         return;

@@ -4,7 +4,7 @@ export function createInputArea() {
 
     const input = document.createElement('input');
     input.className = 'aicc-chat-input';
-    input.placeholder = 'Nhập câu hỏi...';
+    input.placeholder = 'Ask me something...';
     input.type = 'text';
 
     const button = document.createElement('button');

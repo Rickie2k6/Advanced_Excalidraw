@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>Enter Prompt</title>
+
+  <link
+    rel="stylesheet"
+    href="./prompt.css"
+  />
+</head>
+
+<body>
+  <button
+    class="go-back"
+    id="goBack"
+    type="button"
+  >
+    &lt; GO BACK
+  </button>
+
+  <main class="prompt-page">
+    <section class="prompt-container">
+
+      <div class="title-line"></div>
+
+      <h1>ENTER PROMPT</h1>
+
+      <div class="title-line"></div>
+
+      <form
+        class="prompt-box"
+        id="promptForm"
+      >
+        <textarea
+          id="promptInput"
+          placeholder="Describe what you want to create..."
+          rows="1"
+          required
+        ></textarea>
+
+        <button
+          class="submit-button"
+          type="submit"
+          aria-label="Submit prompt"
+        >
+          ➤
+        </button>
+      </form>
+
+    </section>
+  </main>
+
+  <script src="./prompt.js"></script>
+</body>
+</html>

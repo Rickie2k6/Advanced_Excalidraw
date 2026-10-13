@@ -38,3 +38,5 @@ class ChatResponse(BaseModel):
     answer: str
 
     analysis: AnalysisResult | None = None
+
+    visual_action: dict | None = None

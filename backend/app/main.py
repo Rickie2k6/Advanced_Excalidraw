@@ -21,6 +21,8 @@ from app.api.routes import (
     equations,
     strokes,
     presence,
+    images,
+    whiteboard_state,
 )
 
 @asynccontextmanager
@@ -120,6 +122,17 @@ app.include_router(
 
 app.include_router(
     excalidraw_store.router,
+    prefix="/api",
+
+)
+
+app.include_router(
+    images.router,
+    prefix="/api",
+)
+
+app.include_router(
+    whiteboard_state.router,
     prefix="/api",
 )
 

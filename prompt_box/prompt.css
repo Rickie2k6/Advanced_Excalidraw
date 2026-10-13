@@ -1,0 +1,207 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.prompt-landing-page {
+  position: fixed;
+  inset: 0;
+
+  width: 100vw;
+  height: 100vh;
+
+  background-image: url("./assets/noprompt.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  overflow: hidden;
+
+  z-index: 99999;
+}
+
+/* -------------------------
+   PROMPT BOX
+-------------------------- */
+
+.prompt-box {
+  width: 100%;
+  height: 180px;
+
+  margin-top: 20px;
+
+  position: relative;
+
+  display: flex;
+  align-items: center;
+
+  padding:
+    35px
+    120px
+    35px
+    42px;
+
+  border-radius: 36px;
+
+  border:
+    2px solid
+    rgba(179, 166, 255, 0.85);
+
+  background:
+    linear-gradient(
+      110deg,
+      rgba(111, 106, 214, 0.45),
+      rgba(92, 108, 204, 0.32)
+    );
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  box-shadow:
+    inset 0 0 30px
+      rgba(165, 158, 255, 0.18),
+
+    0 0 8px
+      rgba(164, 143, 255, 0.9),
+
+    0 0 28px
+      rgba(100, 77, 255, 0.5);
+}
+
+/* -------------------------
+   TEXTAREA
+-------------------------- */
+
+#promptInput {
+  width: 100%;
+  height: 100%;
+
+  resize: none;
+
+  border: none;
+  outline: none;
+
+  background: transparent;
+
+  color: white;
+
+  font-family: inherit;
+  font-size: 22px;
+  line-height: 1.4;
+}
+
+#promptInput::placeholder {
+  color: rgba(220, 218, 255, 0.62);
+}
+
+/* -------------------------
+   SEND BUTTON
+-------------------------- */
+
+.submit-button {
+  position: absolute;
+
+  right: 32px;
+  top: 50%;
+
+  transform: translateY(-50%);
+
+  width: 84px;
+  height: 84px;
+
+  border-radius: 50%;
+
+  border:
+    2px solid
+    rgba(207, 196, 255, 0.9);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(150, 126, 255, 0.8),
+      rgba(99, 76, 213, 0.8)
+    );
+
+  color: white;
+
+  font-size: 39px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  cursor: pointer;
+
+  box-shadow:
+    inset 0 0 20px
+      rgba(255, 255, 255, 0.15),
+
+    0 0 12px
+      rgba(160, 134, 255, 0.9),
+
+    0 0 30px
+      rgba(100, 70, 255, 0.6);
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.submit-button:hover {
+  transform:
+    translateY(-50%)
+    scale(1.07);
+
+  box-shadow:
+    0 0 16px
+      rgba(188, 170, 255, 1),
+
+    0 0 38px
+      rgba(113, 79, 255, 0.8);
+}
+
+/* -------------------------
+   RESPONSIVE
+-------------------------- */
+
+@media (max-width: 700px) {
+
+  .prompt-container {
+    width: 88vw;
+  }
+
+  .prompt-box {
+    height: 150px;
+
+    padding:
+      28px
+      90px
+      28px
+      28px;
+  }
+
+  #promptInput {
+    font-size: 18px;
+  }
+
+  .submit-button {
+    width: 65px;
+    height: 65px;
+
+    right: 20px;
+  }
+
+  
+}

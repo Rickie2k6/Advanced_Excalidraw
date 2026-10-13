@@ -14,6 +14,11 @@ transformations = (
 def parse_side(text: str):
     text = text.strip()
 
+    if not text:
+        raise ValueError(
+            "Equation side is empty."
+        )
+
     return parse_expr(
         text,
         transformations=transformations,
@@ -30,12 +35,45 @@ def parse_equation(equation: str):
         Eq(3*x + 1, 0)
     """
 
+    if not equation:
+        raise ValueError(
+            "Equation is empty."
+        )
+
+    equation = equation.strip()
+
     if "=" not in equation:
-        raise ValueError(f"Not an equation: {equation}")
+        raise ValueError(
+            f"Not an equation: {equation}"
+        )
 
-    lhs_text, rhs_text = equation.split("=", 1)
+    lhs_text, rhs_text = equation.split(
+        "=",
+        1,
+    )
 
-    lhs = parse_side(lhs_text)
-    rhs = parse_side(rhs_text)
+    lhs_text = lhs_text.strip()
+    rhs_text = rhs_text.strip()
 
-    return sp.Eq(lhs, rhs)
+    if not lhs_text:
+        raise ValueError(
+            f"Missing left-hand side: {equation}"
+        )
+
+    if not rhs_text:
+        raise ValueError(
+            f"Missing right-hand side: {equation}"
+        )
+
+    lhs = parse_side(
+        lhs_text
+    )
+
+    rhs = parse_side(
+        rhs_text
+    )
+
+    return sp.Eq(
+        lhs,
+        rhs,
+    )

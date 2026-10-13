@@ -1,4 +1,76 @@
 {
-  "updated_at": "2026-08-23T18:24:26.799438+00:00",
-  "equations": {}
+  "updated_at": "2026-10-13T15:43:45.366163+00:00",
+  "equations": {
+    "eq_2980e946eacf": {
+      "equation_id": "eq_2980e946eacf",
+      "equation": "x=S x=S x=S",
+      "stroke_ids": [
+        "88lEi03ec4DYzQ2n1_X6x",
+        "XOPP9t1Ec515OSQyS1ruH",
+        "XyOZ4W800K39Lk7VWsKkz",
+        "OC10yZUPZQFuBRlGJ2WhP",
+        "kn4mkif-nUXiU0aJqwhml",
+        "r6_ItpuGkCV7yJ-9ik8o-",
+        "EkfDiOR9BJU3xwrO1WGDc",
+        "xpthI-p_KWNRT_R-yMhAE",
+        "KPKA9Ia-RC_mrngHibVDJ",
+        "oz4zmq-9Vygm_L63ZFlZs",
+        "O3CXFeCV32iKosSx3Lycp",
+        "7Cckv4Sp34C7KMnS5zcPJ",
+        "vCR2_3kySC771YIf07k-4",
+        "M_QsCw6EHK8IcQoghpLM2",
+        "nIY45BsEj8D4Elxx_aS41"
+      ],
+      "bbox": {
+        "x": 100.0,
+        "y": 100.0,
+        "width": 267.0,
+        "height": 30.0
+      },
+      "contributors": [],
+      "confidence": null,
+      "updated_at": "2026-10-13T15:43:45.366163+00:00"
+    },
+    "eq_50d495937e14": {
+      "equation_id": "eq_50d495937e14",
+      "equation": "x=9",
+      "stroke_ids": [
+        "tXTJS1i9MDAEZ71qsV5YV",
+        "hfyNWeVg-vf87RrvIkPPb",
+        "79qMH7SOL8ZSR5E--fLrm",
+        "osgyD1iAfP-3RSgg1Mw2I",
+        "EIlUbd_rfdHU2Ax0nn9kJ"
+      ],
+      "bbox": {
+        "x": 484.0,
+        "y": 100.0,
+        "width": 67.0,
+        "height": 30.0
+      },
+      "contributors": [],
+      "confidence": null,
+      "updated_at": "2026-10-13T15:43:45.366163+00:00"
+    },
+    "eq_c304158bef0d": {
+      "equation_id": "eq_c304158bef0d",
+      "equation": "x=10",
+      "stroke_ids": [
+        "Wfu2Gx5dvI2zHfRnq_ojW",
+        "G3CWk3q8OYZWtVChlTpG0",
+        "KZeKAdaD_Zktwi_oqxfOf",
+        "UZOBqPCK9Mur9S96e9j_v",
+        "CmErQLAGaJ6D_LoJtIE4n",
+        "NOdTUFgPLs7hipFkExqbW"
+      ],
+      "bbox": {
+        "x": 684.0,
+        "y": 100.0,
+        "width": 93.0,
+        "height": 30.0
+      },
+      "contributors": [],
+      "confidence": null,
+      "updated_at": "2026-10-13T15:43:45.366163+00:00"
+    }
+  }
 }

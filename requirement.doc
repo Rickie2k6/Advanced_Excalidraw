@@ -1,17 +1,3 @@
-# Backend dependencies
+# Compatibility entry point; canonical dependencies live in backend/requirements.txt.
 # Install with: python -m pip install -r requirement.doc
-
-fastapi
-uvicorn[standard]
-python-multipart
-python-dotenv
-httpx
-openai
-numpy
-pillow<12
-sympy
-
-# PaddleOCR-VL and its model runtime
-paddleocr[doc-parser]
-transformers>=5.0.0
-accelerate
+-r backend/requirements.txt

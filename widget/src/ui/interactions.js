@@ -121,10 +121,6 @@ export function setupInteractions(container, header) {
         }
     });
 
-    // function setEnabled(enabled) {
-    //     dragInstance.draggable({ enabled });
-    //     resizeInstance.resizable({ enabled });
-    // }
     function setEnabled(enabled) {
         if (enabled) {
             captureGeometry(container);
