@@ -1,8 +1,8 @@
 //đây là command line chạy trong server: corepack yarn start --host 10.255.0.11
 /* gọi lệnh này để activate cái Cloudfkare Tunnel: ~/bin/cloudflared tunnel \
   --url http://10.255.0.11:65533*/
-//sử dụng URL này: https://ronald-hughes-fifty-archives.trycloudflare.com
-import {
+  import PromptPage from "./PromptPage";
+  import {
   Excalidraw,
   LiveCollaborationTrigger,
   TTDDialogTrigger,
@@ -12,9 +12,18 @@ import {
   ExcalidrawAPIProvider,
   useExcalidrawAPI,
   exportToBlob,
+  convertToExcalidrawElements,
 } from "@excalidraw/excalidraw";
 import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
+import {
+  expressionToFreedraw,
+} from "./math-freedraw";
+
+import {
+  findAvailablePosition,
+  estimateMathSize,
+} from "./math-placement";
 import {
   CommandPalette,
   DEFAULT_CATEGORIES,
@@ -449,6 +458,36 @@ type WhiteboardHintsResponse = {
   hints: WhiteboardHint[];
 };
 
+type WhiteboardElementSnapshot = {
+  id: string;
+  type: string;
+
+  x: number;
+  y: number;
+
+  width: number;
+  height: number;
+
+  angle: number;
+  version: number;
+
+  isDeleted: boolean;
+};
+
+type WhiteboardActionPayload = {
+  action:
+    | "create"
+    | "move"
+    | "resize"
+    | "update"
+    | "delete";
+
+  element_id: string;
+  element_type: string;
+
+  data?: Record<string, unknown>;
+};
+
 type HintViewport = {
   scrollX: number;
   scrollY: number;
@@ -535,6 +574,7 @@ const ExcalidrawWrapper = () => {
       }
     }, []);
 
+
   // Load existing hints when app opens.
   useEffect(() => {
     void refreshWhiteboardHints();
@@ -588,6 +628,356 @@ useEffect(() => {
   const localFreedrawIdsRef = useRef<Set<string>>(
     new Set(),
   );
+  // ============================================================
+  // WHITEBOARD IMAGE SYNC
+  // ============================================================
+
+  // Images đã upload thành công
+  const uploadedImageFileIdsRef =
+    useRef<Set<FileId>>(new Set());
+
+  // Images đang upload.
+  // Dùng cái này để tránh onChange upload cùng image nhiều lần.
+  const imageUploadsInFlightRef =
+    useRef<Set<FileId>>(new Set());
+  
+  const whiteboardStateSyncTimerRef =
+  useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  // ============================================================
+  // WHITEBOARD ACTION HISTORY
+  // ============================================================
+
+  const previousActionElementsRef =
+    useRef<Map<string, WhiteboardElementSnapshot>>(
+      new Map(),
+    );
+
+  const actionLogInitializedRef =
+    useRef(false);
+
+  const actionLogTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(
+      null,
+    );
+
+    // ============================================================
+  // SEND WHITEBOARD ACTION TO BACKEND
+  // ============================================================
+
+  const sendWhiteboardAction = (
+    payload: WhiteboardActionPayload,
+  ) => {
+    void fetch(
+      `${CHATBOT_BACKEND_URL}/api/whiteboard/action`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify(payload),
+      },
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          console.error(
+            "[Whiteboard Action] Failed:",
+            response.status,
+            await response.text(),
+          );
+
+          return;
+        }
+
+        console.log(
+          "[Whiteboard Action]",
+          payload.action,
+          payload.element_id,
+        );
+      })
+      .catch((error) => {
+        console.error(
+          "[Whiteboard Action] Request failed:",
+          error,
+        );
+      });
+  };
+
+
+  // ============================================================
+  // CREATE ACTION SNAPSHOT
+  // ============================================================
+
+  const createActionSnapshot = (
+    element: OrderedExcalidrawElement,
+  ): WhiteboardElementSnapshot => {
+    return {
+      id: element.id,
+      type: element.type,
+
+      x: element.x,
+      y: element.y,
+
+      width: element.width,
+      height: element.height,
+
+      angle: element.angle ?? 0,
+      version: element.version ?? 0,
+
+      isDeleted:
+        element.isDeleted ?? false,
+    };
+  };
+
+
+  // ============================================================
+  // PROCESS WHITEBOARD ACTIONS
+  // ============================================================
+
+  const processWhiteboardActions = (
+    elements:
+      readonly OrderedExcalidrawElement[],
+  ) => {
+    const currentElements =
+      new Map<
+        string,
+        WhiteboardElementSnapshot
+      >();
+
+    for (const element of elements) {
+      const current =
+        createActionSnapshot(element);
+
+      currentElements.set(
+        current.id,
+        current,
+      );
+
+      const previous =
+        previousActionElementsRef.current.get(
+          current.id,
+        );
+
+      // CREATE
+      if (!previous) {
+        if (!current.isDeleted) {
+          sendWhiteboardAction({
+            action: "create",
+
+            element_id: current.id,
+            element_type: current.type,
+
+            data: {
+              x: current.x,
+              y: current.y,
+
+              width: current.width,
+              height: current.height,
+
+              angle: current.angle,
+              version: current.version,
+            },
+          });
+        }
+
+        continue;
+      }
+
+      // DELETE
+      if (
+        !previous.isDeleted &&
+        current.isDeleted
+      ) {
+        sendWhiteboardAction({
+          action: "delete",
+
+          element_id: current.id,
+          element_type: current.type,
+
+          data: {
+            previous,
+          },
+        });
+
+        continue;
+      }
+
+      if (
+        current.isDeleted ||
+        previous.isDeleted
+      ) {
+        continue;
+      }
+
+      // No change
+      if (
+        current.version ===
+        previous.version
+      ) {
+        continue;
+      }
+
+      const moved =
+        current.x !== previous.x ||
+        current.y !== previous.y;
+
+      const resized =
+        current.width !== previous.width ||
+        current.height !== previous.height;
+
+      // RESIZE
+      if (resized) {
+        sendWhiteboardAction({
+          action: "resize",
+
+          element_id: current.id,
+          element_type: current.type,
+
+          data: {
+            before: {
+              x: previous.x,
+              y: previous.y,
+
+              width: previous.width,
+              height: previous.height,
+            },
+
+            after: {
+              x: current.x,
+              y: current.y,
+
+              width: current.width,
+              height: current.height,
+            },
+
+            version: current.version,
+          },
+        });
+
+        continue;
+      }
+
+      // MOVE
+      if (moved) {
+        sendWhiteboardAction({
+          action: "move",
+
+          element_id: current.id,
+          element_type: current.type,
+
+          data: {
+            from: {
+              x: previous.x,
+              y: previous.y,
+            },
+
+            to: {
+              x: current.x,
+              y: current.y,
+            },
+
+            version: current.version,
+          },
+        });
+
+        continue;
+      }
+
+      // OTHER UPDATE
+      sendWhiteboardAction({
+        action: "update",
+
+        element_id: current.id,
+        element_type: current.type,
+
+        data: {
+          version: current.version,
+        },
+      });
+    }
+
+    // Detect element removed completely
+    for (
+      const [previousId, previous]
+      of previousActionElementsRef.current
+    ) {
+      if (
+        !currentElements.has(previousId) &&
+        !previous.isDeleted
+      ) {
+        sendWhiteboardAction({
+          action: "delete",
+
+          element_id: previous.id,
+          element_type: previous.type,
+
+          data: {
+            previous,
+          },
+        });
+      }
+    }
+
+    previousActionElementsRef.current =
+      currentElements;
+  };
+
+
+  // ============================================================
+  // TRACK WHITEBOARD ACTIONS
+  // ============================================================
+
+  const trackWhiteboardActions = (
+    elements:
+      readonly OrderedExcalidrawElement[],
+  ) => {
+    const snapshot = [...elements];
+
+    // First call only establishes baseline.
+    if (
+      !actionLogInitializedRef.current
+    ) {
+      previousActionElementsRef.current =
+        new Map(
+          snapshot.map(
+            (element) => [
+              element.id,
+              createActionSnapshot(element),
+            ],
+          ),
+        );
+
+      actionLogInitializedRef.current =
+        true;
+
+      console.log(
+        "[Whiteboard Action] Initial snapshot:",
+        snapshot.length,
+        "element(s)",
+      );
+
+      return;
+    }
+
+    if (actionLogTimerRef.current) {
+      clearTimeout(
+        actionLogTimerRef.current,
+      );
+    }
+
+    actionLogTimerRef.current =
+      setTimeout(() => {
+        actionLogTimerRef.current =
+          null;
+
+        processWhiteboardActions(
+          snapshot,
+        );
+      }, 300);
+  };
 
   // ============================================================
   // EQUATION GROUP -> PNG -> PADDLE OCR
@@ -966,8 +1356,144 @@ useEffect(() => {
       getScene() {
         return {
           elements: excalidrawAPI.getSceneElements(),
+          appState: excalidrawAPI.getAppState(),
+          files: excalidrawAPI.getFiles(),
         };
       },
+
+      addEllipse({
+        x,
+        y,
+        width,
+        height,
+      }: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }) {
+        const currentElements =
+          excalidrawAPI.getSceneElements();
+
+        const [ellipse] =
+          convertToExcalidrawElements([
+            {
+              type: "ellipse",
+              x,
+              y,
+              width,
+              height,
+              strokeColor: "#e03131",
+              backgroundColor: "transparent",
+              fillStyle: "solid",
+              strokeWidth: 3,
+              strokeStyle: "solid",
+              roughness: 1,
+              opacity: 100,
+            },
+          ]);
+
+        excalidrawAPI.updateScene({
+          elements: [
+            ...currentElements,
+            ellipse,
+          ],
+          captureUpdate:
+            CaptureUpdateAction.IMMEDIATELY,
+        });
+
+        console.log(
+          "[Chatbot] Added ellipse:",
+          ellipse,
+        );
+
+        return ellipse;
+      },
+
+      
+      writeMath({
+        expression,
+      }: {
+        expression: string;
+      }) {
+        const currentElements =
+          excalidrawAPI.getSceneElements();
+
+        const { width, height } =
+          estimateMathSize(expression);
+
+        const { x, y } =
+          findAvailablePosition(
+            currentElements,
+            width,
+            height,
+          );
+
+        const rawStrokes =
+          expressionToFreedraw(
+            expression,
+            x,
+            y,
+          );
+
+        const mathElements =
+          convertToExcalidrawElements(
+            rawStrokes,
+          );
+
+        console.table(
+          mathElements.map((element) => ({
+            id: element.id,
+            type: element.type,
+            groupIds: element.groupIds,
+            boundElements: element.boundElements,
+            frameId: element.frameId,
+            index: element.index,
+          })),
+        );
+
+        const existingIds = new Set(
+          currentElements.map((element) => element.id),
+        );
+
+        console.table(
+          mathElements.map((element) => ({
+            id: element.id,
+            type: element.type,
+            version: element.version,
+            versionNonce: element.versionNonce,
+            hasPoints:
+              element.type === "freedraw" &&
+              Array.isArray(element.points),
+            duplicateId: existingIds.has(element.id),
+          })),
+        );
+
+        const allElements = [
+          ...currentElements,
+          ...mathElements,
+        ];
+
+        console.log("[WriteMath] Element counts:", {
+          existing: currentElements.length,
+          generated: mathElements.length,
+          total: allElements.length,
+          uniqueIds: new Set(
+            allElements.map((element) => element.id),
+          ).size,
+        });
+
+        excalidrawAPI.updateScene({
+          elements: allElements,
+          captureUpdate:
+            CaptureUpdateAction.IMMEDIATELY,
+        });
+
+        return mathElements;
+      },
+
+              
+
 
       async exportWhiteboardToPng() {
         const elements =
@@ -1485,7 +2011,276 @@ useEffect(() => {
   }, [excalidrawAPI]);
 
 
+  // ============================================================
+  // SYNC INSERTED IMAGES TO CHATBOT BACKEND
+  // ============================================================
 
+  const syncImagesToBackend = useCallback(
+    async (
+      elements: readonly OrderedExcalidrawElement[],
+      files: BinaryFiles,
+    ) => {
+      for (const element of elements) {
+        // Chỉ xử lý image đã được Excalidraw initialize
+        if (
+          !isInitializedImageElement(element) ||
+          element.isDeleted
+        ) {
+          continue;
+        }
+
+        const fileId = element.fileId;
+
+        // Đã upload rồi -> bỏ qua
+        if (
+          uploadedImageFileIdsRef.current.has(fileId)
+        ) {
+          continue;
+        }
+
+        // Đang upload -> bỏ qua để tránh duplicate request
+        if (
+          imageUploadsInFlightRef.current.has(fileId)
+        ) {
+          continue;
+        }
+
+        const imageFile = files[fileId];
+
+        // Image data chưa available
+        if (!imageFile?.dataURL) {
+          continue;
+        }
+
+        imageUploadsInFlightRef.current.add(fileId);
+
+        try {
+          // ----------------------------------------------------
+          // 1. Convert Excalidraw dataURL -> actual binary Blob
+          // ----------------------------------------------------
+
+          const blobResponse = await fetch(
+            imageFile.dataURL,
+          );
+
+          if (!blobResponse.ok) {
+            throw new Error(
+              `Could not convert image ${fileId} to Blob`,
+            );
+          }
+
+          const blob = await blobResponse.blob();
+
+          // ----------------------------------------------------
+          // 2. Determine file extension
+          // ----------------------------------------------------
+
+          let extension = "png";
+
+          switch (imageFile.mimeType) {
+            case "image/jpeg":
+              extension = "jpg";
+              break;
+
+            case "image/webp":
+              extension = "webp";
+              break;
+
+            case "image/svg+xml":
+              extension = "svg";
+              break;
+
+            case "image/png":
+            default:
+              extension = "png";
+              break;
+          }
+
+          // ----------------------------------------------------
+          // 3. Build multipart/form-data
+          // ----------------------------------------------------
+
+          const formData = new FormData();
+
+          formData.append(
+            "image",
+            blob,
+            `${fileId}.${extension}`,
+          );
+
+          formData.append(
+            "file_id",
+            fileId,
+          );
+
+          formData.append(
+            "element_id",
+            element.id,
+          );
+
+          formData.append(
+            "mime_type",
+            imageFile.mimeType,
+          );
+
+          formData.append(
+            "x",
+            String(element.x),
+          );
+
+          formData.append(
+            "y",
+            String(element.y),
+          );
+
+          formData.append(
+            "width",
+            String(element.width),
+          );
+
+          formData.append(
+            "height",
+            String(element.height),
+          );
+
+          // ----------------------------------------------------
+          // 4. Send actual image to FastAPI
+          // ----------------------------------------------------
+
+          const response = await fetch(
+            `${CHATBOT_BACKEND_URL}/api/whiteboard/images`,
+            {
+              method: "POST",
+              body: formData,
+            },
+          );
+
+          if (!response.ok) {
+            const errorText =
+              await response.text();
+
+            throw new Error(
+              `Image upload failed: ${response.status} ${errorText}`,
+            );
+          }
+
+          const result =
+            await response.json();
+
+          // ----------------------------------------------------
+          // 5. Mark successful
+          // ----------------------------------------------------
+
+          uploadedImageFileIdsRef.current.add(
+            fileId,
+          );
+
+          console.log(
+            "[Whiteboard Image] Uploaded:",
+            {
+              elementId: element.id,
+              fileId,
+              mimeType: imageFile.mimeType,
+              backend: result,
+            },
+          );
+        } catch (error) {
+          console.error(
+            "[Whiteboard Image] Upload failed:",
+            fileId,
+            error,
+          );
+        } finally {
+          imageUploadsInFlightRef.current.delete(
+            fileId,
+          );
+        }
+      }
+    },
+    [],
+  );
+
+  const syncWhiteboardStateToBackend =
+  useCallback(
+    async (
+      elements:
+        readonly OrderedExcalidrawElement[],
+      appState: AppState,
+    ) => {
+      const currentElements =
+        elements.filter(
+          (element) =>
+            !element.isDeleted,
+        );
+
+      console.log(
+        "[Whiteboard State] Sending:",
+        currentElements.length,
+        currentElements,
+      );
+
+      const payload = {
+        elements: currentElements,
+
+        app_state: {
+          scrollX:
+            appState.scrollX,
+
+          scrollY:
+            appState.scrollY,
+
+          zoom:
+            appState.zoom?.value ?? 1,
+
+          viewBackgroundColor:
+            appState.viewBackgroundColor,
+        },
+      };
+
+      try {
+        const response =
+          await fetch(
+            `${CHATBOT_BACKEND_URL}/api/whiteboard/state`,
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify(
+                  payload,
+                ),
+            },
+          );
+
+        if (!response.ok) {
+          const errorText =
+            await response.text();
+
+          throw new Error(
+            `Whiteboard state sync failed: ${response.status} ${errorText}`,
+          );
+        }
+
+        const result =
+          await response.json();
+
+        console.log(
+          "[Whiteboard State] Synced:",
+          result,
+        );
+      } catch (error) {
+        console.error(
+          "[Whiteboard State] Sync failed:",
+          error,
+        );
+      }
+    },
+    [],
+  );
   const onChange = (
     elements:
       readonly OrderedExcalidrawElement[],
@@ -1608,7 +2403,16 @@ useEffect(() => {
 
 
     // ============================================================
-    // 3. SYNC ELEMENTS TO LIVE COLLABORATION
+    // 3. LOG WHITEBOARD ACTION HISTORY
+    // ============================================================
+
+    if (!appState.newElement) {
+      trackWhiteboardActions(
+        nextElements,
+      );
+    }
+    // ============================================================
+    // 4. SYNC ELEMENTS TO LIVE COLLABORATION
     // ============================================================
 
     if (
@@ -1621,7 +2425,7 @@ useEffect(() => {
 
 
     // ============================================================
-    // 4. SAVE FINISHED STROKES TO strokes.json
+    // 5. SAVE FINISHED STROKES TO strokes.json
     // ============================================================
 
     if (!appState.newElement) {
@@ -1630,10 +2434,28 @@ useEffect(() => {
       );
     }
 
+    // ============================================================
+    // 6. SYNC INSERTED IMAGES TO CHATBOT BACKEND
+    // ============================================================
+
+    void syncImagesToBackend(
+      nextElements,
+      files,
+    );
+    // ============================================================
+    // 7. SYNC CURRENT WHITEBOARD STATE TO CHATBOT BACKEND
+    // ============================================================
+
+    syncWhiteboardStateToBackend(
+      nextElements,
+      appState,
+    );
 
     // ============================================================
-    // 5. EXISTING LOCAL EXCALIDRAW SAVE
+    // 8. EXISTING LOCAL EXCALIDRAW SAVE
     // ============================================================
+
+    
 
     if (!LocalData.isSavePaused()) {
       LocalData.save(
@@ -2349,6 +3171,7 @@ useEffect(() => {
 const ExcalidrawApp = () => {
   const isCloudExportWindow =
     window.location.pathname === "/excalidraw-plus-export";
+
   if (isCloudExportWindow) {
     return <ExcalidrawPlusIframeExport />;
   }
@@ -2363,5 +3186,40 @@ const ExcalidrawApp = () => {
     </TopErrorBoundary>
   );
 };
+// const ExcalidrawApp = () => {
+//   const isCloudExportWindow =
+//     window.location.pathname === "/excalidraw-plus-export";
 
+//   const [showPromptPage, setShowPromptPage] =
+//     useState(true);
+
+//   if (isCloudExportWindow) {
+//     return <ExcalidrawPlusIframeExport />;
+//   }
+
+//   if (showPromptPage) {
+//     return (
+//       <PromptPage
+//         onSubmit={(prompt) => {
+//           console.log(
+//             "[Excalidraw App] Received initial prompt:",
+//             prompt,
+//           );
+
+//           setShowPromptPage(false);
+//         }}
+//       />
+//     );
+//   }
+
+//   return (
+//     <TopErrorBoundary>
+//       <Provider store={appJotaiStore}>
+//         <ExcalidrawAPIProvider>
+//           <ExcalidrawWrapper />
+//         </ExcalidrawAPIProvider>
+//       </Provider>
+//     </TopErrorBoundary>
+//   );
+// };
 export default ExcalidrawApp;
