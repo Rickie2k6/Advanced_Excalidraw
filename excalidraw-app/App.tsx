@@ -18,8 +18,9 @@ import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
 import {
   expressionToFreedraw,
+  measureMathExpression,
 } from "./math-freedraw";
-
+import { animateMathHandwriting } from "./math-handwriting-animation";
 import {
   findAvailablePosition,
   estimateMathSize,
@@ -1236,7 +1237,8 @@ useEffect(() => {
             (element) => {
               if (
                 element.type !== "freedraw" ||
-                element.isDeleted
+                element.isDeleted ||
+                element.customData?.createdByAgent === true
               ) {
                 return [];
               }
@@ -1329,7 +1331,14 @@ useEffect(() => {
     };
   }, []);
 
-/**
+  // ============================================================
+  // JARVIS HANDWRITING ANIMATION QUEUE
+  // ============================================================
+
+  const handwritingQueueRef = useRef<Promise<void>>(
+      Promise.resolve(),
+    );
+  /**
    * EN:
    * Expose the minimum Excalidraw functionality required by the
    * external chatbot. The chatbot can read the current scene and
@@ -1345,6 +1354,7 @@ useEffect(() => {
       return;
     }
 
+    
     const bridge = {
       /**
        * EN:
@@ -1386,7 +1396,7 @@ useEffect(() => {
               strokeColor: "#e03131",
               backgroundColor: "transparent",
               fillStyle: "solid",
-              strokeWidth: 3,
+              strokeWidth: 1,
               strokeStyle: "solid",
               roughness: 1,
               opacity: 100,
@@ -1399,7 +1409,7 @@ useEffect(() => {
             ellipse,
           ],
           captureUpdate:
-            CaptureUpdateAction.IMMEDIATELY,
+            CaptureUpdateAction.NEVER,
         });
 
         console.log(
@@ -1411,88 +1421,340 @@ useEffect(() => {
       },
 
       
+      
       writeMath({
         expression,
+        x,
+        y,
+        anchorElementIds,
+        solutionGroupId,
+        actionId,
       }: {
         expression: string;
+        x?: number;
+        y?: number;
+        anchorElementIds?: string[];
+        solutionGroupId?: string;
+        actionId?: string;
       }) {
-        const currentElements =
-          excalidrawAPI.getSceneElements();
+        const run = async () => {
+          // 1. Validate input
+          if (!expression?.trim()) {
+            throw new Error("Math expression is empty.");
+          }
 
-        const { width, height } =
-          estimateMathSize(expression);
+          if ((x === undefined) !== (y === undefined)) {
+            throw new Error(
+              "Provide both x and y, or neither.",
+            );
+          }
 
-        const { x, y } =
-          findAvailablePosition(
-            currentElements,
+          if (
+            x !== undefined &&
+            (!Number.isFinite(x) || !Number.isFinite(y))
+          ) {
+            throw new Error("Invalid coordinates.");
+          }
+
+          // 2. Read the latest scene inside the queue
+          const currentElements =
+            excalidrawAPI.getSceneElements();
+
+          const { width, height } =
+            measureMathExpression(expression);
+
+          if (!(width > 0 && height > 0)) {
+            throw new Error("Invalid math dimensions.");
+          }
+
+          // 3. Collision detection
+          const padding = 16;
+
+          const collides = (px: number, py: number) =>
+            currentElements.some(
+              (element) =>
+                !element.isDeleted &&
+                px < element.x + element.width + padding &&
+                px + width + padding > element.x &&
+                py < element.y + element.height + padding &&
+                py + height + padding > element.y,
+            );
+
+          // 4. Determine placement
+          let position: { x: number; y: number };
+
+          if (x !== undefined && y !== undefined) {
+            position = { x, y };
+
+            if (collides(x, y)) {
+              throw new Error(
+                "Requested position overlaps existing elements.",
+              );
+            }
+          } else if (anchorElementIds?.length) {
+            const anchorIds = new Set(anchorElementIds);
+
+            const anchors = currentElements.filter(
+              (element) =>
+                !element.isDeleted &&
+                anchorIds.has(element.id),
+            );
+
+            if (anchors.length !== anchorIds.size) {
+              throw new Error(
+                "Some anchor elements are missing from the scene.",
+              );
+            }
+
+            const left = Math.min(
+              ...anchors.map((element) => element.x),
+            );
+
+            const bottom = Math.max(
+              ...anchors.map(
+                (element) => element.y + element.height,
+              ),
+            );
+
+            position = {
+              x: left,
+              y: bottom + 24,
+            };
+
+            let attempts = 0;
+
+            while (
+              collides(position.x, position.y) &&
+              attempts < 100
+            ) {
+              position.y += Math.max(
+                height + padding,
+                24,
+              );
+              attempts++;
+            }
+
+            if (collides(position.x, position.y)) {
+              throw new Error(
+                "No free space below anchor elements.",
+              );
+            }
+          } else {
+            position = findAvailablePosition(
+              currentElements,
+              width,
+              height,
+            );
+
+            if (collides(position.x, position.y)) {
+              throw new Error(
+                "Automatic placement overlaps existing elements.",
+              );
+            }
+          }
+
+          // 5. Generate native freedraw strokes
+          const rawStrokes = expressionToFreedraw(
+            expression,
+            position.x,
+            position.y,
+          );
+
+          if (!rawStrokes.length) {
+            throw new Error(
+              "Expression generated no drawing strokes.",
+            );
+          }
+
+          
+          
+          
+          
+          const converted = convertToExcalidrawElements(
+            rawStrokes.map((stroke) => ({
+              ...stroke,
+              type: "freedraw" as const,
+            })) as unknown as NonNullable<
+              Parameters<typeof convertToExcalidrawElements>[0]
+            >,
+          );
+
+
+
+
+
+          if (!converted.length) {
+            throw new Error(
+              "Failed to create Excalidraw elements.",
+            );
+          }
+
+          // 6. Normalize elements and attach metadata
+          const mathElements = converted.map((element) => ({
+            ...element,
+            version:
+              Number.isInteger(element.version) &&
+              element.version >= 0
+                ? element.version
+                : 1,
+            versionNonce: Number.isInteger(
+              element.versionNonce,
+            )
+              ? element.versionNonce
+              : Math.floor(Math.random() * 2 ** 31),
+            isDeleted: false as const,
+            customData: {
+              ...element.customData,
+              createdByAgent: true,
+              agentSolutionGroupId: solutionGroupId ?? null,
+              agentActionId: actionId ?? null,
+            },
+          }));
+
+          const invalidElements = mathElements.filter(
+            (element) =>
+              !Number.isInteger(element.version) ||
+              element.version < 0 ||
+              !Number.isInteger(element.versionNonce),
+          );
+
+          if (invalidElements.length > 0) {
+            throw new Error(
+              "Generated elements have invalid versions.",
+            );
+          }
+
+          const elementIds = mathElements.map(
+            (element) => element.id,
+          );
+
+          const allIds = [
+            ...excalidrawAPI
+              .getSceneElementsIncludingDeleted()
+              .map((element) => element.id),
+            ...elementIds,
+          ];
+
+          if (new Set(allIds).size !== allIds.length) {
+            throw new Error(
+              "Duplicate Excalidraw element IDs detected.",
+            );
+          }
+
+          // 7. Get the overlay container
+          const container = hintOverlayRootRef.current;
+
+          if (!container) {
+            throw new Error(
+              "Handwriting overlay container is missing.",
+            );
+          }
+
+          // 8. Animate handwriting, then commit
+          await animateMathHandwriting({
+            container,
+
+            strokes: mathElements.map((element) => {
+              if (element.type !== "freedraw") {
+                throw new Error(
+                  "Expected freedraw element.",
+                );
+              }
+
+              return {
+                x: element.x,
+                y: element.y,
+                points: element.points.map(
+                  (point) =>
+                    [point[0], point[1]] as const,
+                ),
+                strokeColor: element.strokeColor,
+                strokeWidth: element.strokeWidth,
+              };
+            }),
+
+            getViewport: () => {
+              const state = excalidrawAPI.getAppState();
+
+              return {
+                scrollX: state.scrollX,
+                scrollY: state.scrollY,
+                zoom: Number(state.zoom?.value ?? 1),
+                offsetLeft: state.offsetLeft ?? 0,
+                offsetTop: state.offsetTop ?? 0,
+              };
+            },
+
+            durationPerStroke: 180,
+
+            // Called while SVG overlay is still visible.
+            onComplete: () => {
+              const latestElements =
+                excalidrawAPI
+                  .getSceneElementsIncludingDeleted();
+
+              const latestIds = new Set(
+                latestElements.map(
+                  (element) => element.id,
+                ),
+              );
+
+              if (
+                elementIds.some((id) => latestIds.has(id))
+              ) {
+                throw new Error(
+                  "Generated element IDs already exist.",
+                );
+              }
+
+              excalidrawAPI.updateScene({
+                elements: [
+                  ...latestElements,
+                  ...mathElements,
+                ],
+                captureUpdate:
+                  CaptureUpdateAction.IMMEDIATELY,
+              });
+            },
+          });
+
+          // 9. Verify committed elements
+          const sceneIds = new Set(
+            excalidrawAPI
+              .getSceneElements()
+              .map((element) => element.id),
+          );
+
+          const success = elementIds.every(
+            (id) => sceneIds.has(id),
+          );
+
+          return {
+            success,
+            expression,
+            element_ids: elementIds,
+            position,
             width,
             height,
-          );
+            error: success
+              ? null
+              : "Generated elements not found in scene.",
+          };
+        };
 
-        const rawStrokes =
-          expressionToFreedraw(
-            expression,
-            x,
-            y,
-          );
+        // 10. Queue each handwriting request
+        const pending =
+          handwritingQueueRef.current.then(run);
 
-        const mathElements =
-          convertToExcalidrawElements(
-            rawStrokes,
-          );
-
-        console.table(
-          mathElements.map((element) => ({
-            id: element.id,
-            type: element.type,
-            groupIds: element.groupIds,
-            boundElements: element.boundElements,
-            frameId: element.frameId,
-            index: element.index,
-          })),
+        // Keep the queue alive even if one request fails.
+        handwritingQueueRef.current = pending.then(
+          () => undefined,
+          () => undefined,
         );
 
-        const existingIds = new Set(
-          currentElements.map((element) => element.id),
-        );
-
-        console.table(
-          mathElements.map((element) => ({
-            id: element.id,
-            type: element.type,
-            version: element.version,
-            versionNonce: element.versionNonce,
-            hasPoints:
-              element.type === "freedraw" &&
-              Array.isArray(element.points),
-            duplicateId: existingIds.has(element.id),
-          })),
-        );
-
-        const allElements = [
-          ...currentElements,
-          ...mathElements,
-        ];
-
-        console.log("[WriteMath] Element counts:", {
-          existing: currentElements.length,
-          generated: mathElements.length,
-          total: allElements.length,
-          uniqueIds: new Set(
-            allElements.map((element) => element.id),
-          ).size,
-        });
-
-        excalidrawAPI.updateScene({
-          elements: allElements,
-          captureUpdate:
-            CaptureUpdateAction.IMMEDIATELY,
-        });
-
-        return mathElements;
+        return pending;
       },
 
-              
 
 
       async exportWhiteboardToPng() {

@@ -1144,6 +1144,34 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
         !this.satisfiesUniqueInvariants(elementsDelta, id) ||
         !satifiesSpecialInvariants(delta)
       ) {
+        
+        console.table({
+          id: {
+            value: id,
+          },
+          type: {
+            value: type,
+          },
+          deletedVersion: {
+            value: delta.deleted.version,
+          },
+          insertedVersion: {
+            value: delta.inserted.version,
+          },
+          deletedIsDeleted: {
+            value: delta.deleted.isDeleted,
+          },
+          insertedIsDeleted: {
+            value: delta.inserted.isDeleted,
+          },
+        });
+
+        console.log("[Delta Debug]", {
+          commonValid: this.satisfiesCommmonInvariants(delta),
+          uniqueValid: this.satisfiesUniqueInvariants(elementsDelta, id),
+          specialValid: satifiesSpecialInvariants(delta),
+        });
+        
         console.error(
           `Broken invariant for "${type}" delta, element "${id}", delta:`,
           delta,
