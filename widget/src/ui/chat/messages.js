@@ -1,6 +1,8 @@
+
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-
+import katex from "katex";
+import "katex/dist/katex.min.css";
 
 export function createMessagesArea() {
   const messages =
@@ -44,7 +46,52 @@ export function createMessagesArea() {
     placeholder,
   };
 }
+function renderMathMarkdown(text) {
+  const mathExpressions = [];
 
+  const protectedText = String(text ?? "").replace(
+    /\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$\$([\s\S]*?)\$\$/g,
+    (match, displayMath, inlineMath, dollarMath) => {
+      const expression =
+        displayMath ?? inlineMath ?? dollarMath;
+
+      const displayMode =
+        displayMath !== undefined ||
+        dollarMath !== undefined;
+
+      const index = mathExpressions.length;
+
+      mathExpressions.push({
+        expression,
+        displayMode,
+      });
+
+      return `MATHPLACEHOLDER${index}END`;
+    },
+  );
+
+  let html = marked.parse(protectedText);
+
+  html = html.replace(
+    /MATHPLACEHOLDER(\d+)END/g,
+    (match, index) => {
+      const math = mathExpressions[Number(index)];
+
+      if (!math) {
+        return match;
+      }
+
+      return katex.renderToString(math.expression, {
+        displayMode: math.displayMode,
+        throwOnError: false,
+        output: "html",
+        trust: false,
+      });
+    },
+  );
+
+  return DOMPurify.sanitize(html);
+}
 
 export function addMessage(
   container,
@@ -86,15 +133,7 @@ export function addMessage(
     renderMarkdown &&
     !isUser
   ) {
-    const html =
-      marked.parse(
-        text ?? "",
-      );
-
-    message.innerHTML =
-      DOMPurify.sanitize(
-        html,
-      );
+    message.innerHTML = renderMathMarkdown(text);
   } else {
     message.textContent =
       text ?? "";
@@ -178,6 +217,7 @@ export async function sendMessage(
     true,
   );
 
+  let backendResponded = false;
 
   try {
     // ============================================================
@@ -397,6 +437,8 @@ export async function sendMessage(
     const data =
       await response.json();
 
+    backendResponded = true;
+
 
     console.log(
       "[Chatbot] backend response:",
@@ -492,14 +534,217 @@ export async function sendMessage(
           // vị trí trên whiteboard.
           // ========================================================
 
-          bridge.writeMath({
+          const result = await bridge.writeMath({
             expression,
           });
+
+          if (!result?.success) {
+            throw new Error(
+              result?.error ?? "Failed to write math.",
+            );
+          }
         } else {
           console.error(
             "[Chatbot] writeMath is not available.",
           );
         }
+      }
+
+
+          // ------------------------------------------------------------
+          // WRITE MATH STEPS
+          // ------------------------------------------------------------
+
+          else if (
+            action === "write_math_steps"
+          ) {
+            const {
+              steps,
+              source_stroke_ids: sourceStrokeIds,
+            } = data.visual_action;
+
+            console.log(
+              "[Chatbot] executing write_math_steps:",
+              steps,
+            );
+
+            if (
+              !Array.isArray(steps) ||
+              steps.length === 0
+            ) {
+              throw new Error(
+                "Invalid write_math_steps: steps must be a non-empty array.",
+              );
+            }
+
+            if (
+              typeof bridge.writeMath !== "function"
+            ) {
+              throw new Error(
+                "Excalidraw writeMath is not available.",
+              );
+            }
+
+            const solutionGroupId =
+              `solution-${Date.now()}`;
+
+            const hasSourceStrokes =
+              Array.isArray(sourceStrokeIds) &&
+              sourceStrokeIds.length > 0;
+
+            let anchorElementIds = hasSourceStrokes
+              ? [...sourceStrokeIds]
+              : [];
+
+            const stepsToDraw = hasSourceStrokes
+              ? steps.slice(1)
+              : steps;  
+
+            for (let i = 0; i < stepsToDraw.length; i++) {
+              const expression = stepsToDraw[i];
+
+              if (
+                typeof expression !== "string" ||
+                !expression.trim()
+              ) {
+                throw new Error(
+                  `Invalid expression at step ${i + 1}`,
+                );
+              }
+
+              const result = await bridge.writeMath({
+                expression,
+                anchorElementIds,
+                solutionGroupId,
+                actionId: `step-${i + 1}`,
+              });
+
+              if (
+                !result?.success ||
+                !Array.isArray(result.element_ids) ||
+                result.element_ids.length === 0
+              ) {
+                throw new Error(
+                  `Failed to write step ${i + 1}`,
+                );
+              }
+
+              anchorElementIds = result.element_ids;
+
+              console.log(
+                `[Chatbot] Step ${i + 1} written:`,
+                expression,
+              );
+            }
+
+            console.log(
+              "[Chatbot] All math steps written successfully.",
+            );
+          }
+
+
+      // ------------------------------------------------------------
+      // WRITE MULTIPLE MATH STEPS
+      // Solve all recognized equations on the whiteboard
+      // ------------------------------------------------------------
+
+      else if (action === "write_multiple_math_steps") {
+        const { solutions } = data.visual_action;
+
+        if (!Array.isArray(solutions) || solutions.length === 0) {
+          throw new Error(
+            "Invalid write_multiple_math_steps: no solutions provided.",
+          );
+        }
+
+        if (typeof bridge.writeMath !== "function") {
+          throw new Error(
+            "Excalidraw writeMath is not available.",
+          );
+        }
+
+        console.log(
+          "[Chatbot] Solving multiple equations:",
+          solutions,
+        );
+
+        for (let groupIndex = 0; groupIndex < solutions.length; groupIndex++) {
+          const solution = solutions[groupIndex];
+
+          const {
+            steps,
+            source_equation_id: sourceEquationId,
+            source_stroke_ids: sourceStrokeIds,
+          } = solution;
+
+          if (!Array.isArray(steps) || steps.length === 0) {
+            console.warn(
+              "[Chatbot] Skipping invalid solution:",
+              solution,
+            );
+            continue;
+          }
+
+          const hasSourceStrokes =
+            Array.isArray(sourceStrokeIds) &&
+            sourceStrokeIds.length > 0;
+
+          const solutionGroupId =
+            `solution-${sourceEquationId ?? groupIndex}-${Date.now()}`;
+
+          // Start below the original handwritten equation.
+          let anchorElementIds = hasSourceStrokes
+            ? [...sourceStrokeIds]
+            : [];
+
+          // Don't redraw the original equation if it's already
+          // handwritten on the whiteboard.
+          const stepsToDraw = hasSourceStrokes
+            ? steps.slice(1)
+            : steps;
+
+          for (let stepIndex = 0; stepIndex < stepsToDraw.length; stepIndex++) {
+            const expression = stepsToDraw[stepIndex];
+
+            if (
+              typeof expression !== "string" ||
+              !expression.trim()
+            ) {
+              throw new Error(
+                `Invalid math step at index ${stepIndex}`,
+              );
+            }
+
+            const result = await bridge.writeMath({
+              expression,
+              anchorElementIds,
+              solutionGroupId,
+              actionId: `step-${stepIndex + 1}`,
+            });
+
+            if (
+              !result?.success ||
+              !Array.isArray(result.element_ids) ||
+              result.element_ids.length === 0
+            ) {
+              throw new Error(
+                `Failed to draw math step: ${expression}`,
+              );
+            }
+
+            // Position the next step relative to the previous step.
+            anchorElementIds = result.element_ids;
+
+            console.log(
+              `[Chatbot] Equation ${groupIndex + 1}, step ${stepIndex + 1}:`,
+              expression,
+            );
+          }
+        }
+
+        console.log(
+          "[Chatbot] Finished drawing multiple equation solutions.",
+        );
       }
 
 
@@ -539,7 +784,9 @@ export async function sendMessage(
 
     addMessage(
       messages,
-      "Không thể kết nối tới chatbot backend.",
+      backendResponded
+        ? `Đã nhận phản hồi từ backend nhưng xảy ra lỗi xử lý: ${error.message}`
+        : `Không thể hoàn tất yêu cầu tới chatbot backend: ${error.message}`,
       false,
     );
 

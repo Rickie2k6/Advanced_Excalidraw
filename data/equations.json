@@ -1,76 +1,77 @@
 {
-  "updated_at": "2026-10-13T15:48:02.403250+00:00",
+  "updated_at": "2026-10-18T19:34:05.772975+00:00",
   "equations": {
-    "eq_2980e946eacf": {
-      "equation_id": "eq_2980e946eacf",
-      "equation": "x=S x=S x=S",
+    "eq_66f0f151608b": {
+      "equation_id": "eq_66f0f151608b",
+      "equation": "3x+4=19",
       "stroke_ids": [
-        "88lEi03ec4DYzQ2n1_X6x",
-        "XOPP9t1Ec515OSQyS1ruH",
-        "XyOZ4W800K39Lk7VWsKkz",
-        "OC10yZUPZQFuBRlGJ2WhP",
-        "kn4mkif-nUXiU0aJqwhml",
-        "r6_ItpuGkCV7yJ-9ik8o-",
-        "EkfDiOR9BJU3xwrO1WGDc",
-        "xpthI-p_KWNRT_R-yMhAE",
-        "KPKA9Ia-RC_mrngHibVDJ",
-        "oz4zmq-9Vygm_L63ZFlZs",
-        "O3CXFeCV32iKosSx3Lycp",
-        "7Cckv4Sp34C7KMnS5zcPJ",
-        "vCR2_3kySC771YIf07k-4",
-        "M_QsCw6EHK8IcQoghpLM2",
-        "nIY45BsEj8D4Elxx_aS41"
+        "Wgvs9Io1oc0v9C5FPq0DE",
+        "tUqUszqXWEWO5GhLY3Z84",
+        "uhRT9XwY8XDmiMb76AzEj",
+        "UubI2mU3yo_4BF7s8j4N5",
+        "ID-j2WfW2aUXXSyLN-jB9",
+        "VtbRZaDC6CBeMnA7un_Yy",
+        "EnqmrHOOodlE9M7UIJ8gQ",
+        "DAMkgeZMjtZVXKKxBS2Ny",
+        "aQL6t_4E-VmL71vjNIx_C",
+        "mbsvpB3vqek5VvAUt6bag",
+        "ZmiiolxoMlNxr7DnVVrgR"
       ],
       "bbox": {
-        "x": 100.0,
-        "y": 100.0,
-        "width": 267.0,
-        "height": 30.0
+        "x": 432.8125,
+        "y": 294.984375,
+        "width": 248.74609375,
+        "height": 61.42578125
       },
-      "contributors": [],
+      "contributors": [
+        "6c0f2ecc-7e9d-4864-88f2-ecd262836cb8"
+      ],
       "confidence": null,
-      "updated_at": "2026-10-13T15:48:01.380734+00:00"
+      "updated_at": "2026-10-18T19:34:05.146629+00:00"
     },
-    "eq_50d495937e14": {
-      "equation_id": "eq_50d495937e14",
-      "equation": "x=9",
+    "eq_864e46b8d2a4": {
+      "equation_id": "eq_864e46b8d2a4",
+      "equation": "2x+1=0",
       "stroke_ids": [
-        "tXTJS1i9MDAEZ71qsV5YV",
-        "hfyNWeVg-vf87RrvIkPPb",
-        "79qMH7SOL8ZSR5E--fLrm",
-        "osgyD1iAfP-3RSgg1Mw2I",
-        "EIlUbd_rfdHU2Ax0nn9kJ"
+        "6Sr9qMfKBnbzlIoOblH0l",
+        "A-Uk7-W4W-VD2GiHi3jca",
+        "4wCeF6bSyT0g-L3UDMGt3",
+        "StamJJ49lpRAKIjXPzZor",
+        "5dBOoh4nTNcjLaHpnnYdj",
+        "a-2Y9Nw19DEWtuQIAZjP3",
+        "jKHyO2l6sEQCtQwDlEt9Y",
+        "23ZxU8NPyrlUgBqwJRm5i",
+        "iSV6oX0XrqJbbjYNQAkgV"
       ],
       "bbox": {
-        "x": 484.0,
-        "y": 100.0,
-        "width": 67.0,
-        "height": 30.0
+        "x": 675.671875,
+        "y": 543.539306640625,
+        "width": 262.16796875,
+        "height": 79.015625
       },
-      "contributors": [],
+      "contributors": [
+        "6c0f2ecc-7e9d-4864-88f2-ecd262836cb8"
+      ],
       "confidence": null,
-      "updated_at": "2026-10-13T15:48:01.380734+00:00"
+      "updated_at": "2026-10-18T19:34:05.146629+00:00"
     },
-    "eq_c304158bef0d": {
-      "equation_id": "eq_c304158bef0d",
-      "equation": "x=10",
+    "eq_e4fa5892eb0c": {
+      "equation_id": "eq_e4fa5892eb0c",
+      "equation": "\\bullet \\quad \\bullet",
       "stroke_ids": [
-        "Wfu2Gx5dvI2zHfRnq_ojW",
-        "G3CWk3q8OYZWtVChlTpG0",
-        "KZeKAdaD_Zktwi_oqxfOf",
-        "UZOBqPCK9Mur9S96e9j_v",
-        "CmErQLAGaJ6D_LoJtIE4n",
-        "NOdTUFgPLs7hipFkExqbW"
+        "TtCfvbL2qvnH2-T9Ugt7-"
       ],
       "bbox": {
-        "x": 684.0,
-        "y": 100.0,
-        "width": 93.0,
-        "height": 30.0
+        "x": 1660.43359375,
+        "y": 747.37109375,
+        "width": 2.84375,
+        "height": 0.0
       },
-      "contributors": [],
+      "contributors": [
+        "6c0f2ecc-7e9d-4864-88f2-ecd262836cb8"
+      ],
       "confidence": null,
-      "updated_at": "2026-10-13T15:48:01.380734+00:00"
+      "updated_at": "2026-10-18T19:34:05.146629+00:00"
     }
   }
 }
