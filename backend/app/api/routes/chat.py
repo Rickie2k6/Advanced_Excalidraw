@@ -9,6 +9,8 @@ from app.services.detector import (
     detect_target,
 )
 
+from app.services.math_agent import solve_linear_steps
+from app.services.equation_context import load_equations
 from app.services.visual_geometry import (
     image_bbox_to_excalidraw,
 )
@@ -130,7 +132,99 @@ def extract_write_math_action(
 
     return None
 
+def extract_solve_math_action(question: str):
+    match = re.search(
+        r"(?i)\b(?:giải(?: phương trình)?|solve(?: the equation)?)"
+        r"\s*[:：]?\s*"
+        r"([0-9xX+\-=\s]+)",
+        question,
+    )
 
+    if not match:
+        return None
+
+    expression = match.group(1).strip()
+
+    if "=" not in expression:
+        return None
+
+    try:
+        return solve_linear_steps(expression)
+
+    except ValueError as error:
+        print(
+            "[Math Agent] Unsupported equation:",
+            error,
+        )
+        return None
+
+def extract_whiteboard_solve_action(question: str) -> dict | None:
+    """
+    Solve recognized handwritten equations on the whiteboard.
+
+    - "Solve this equation": solve only when exactly one
+      valid equation exists.
+    - "Solve all equations": solve every valid equation.
+    """
+
+    question_lower = question.strip().lower()
+
+    solve_intent = bool(
+        re.search(r"\b(solve|giải)\b", question_lower)
+    )
+
+    if not solve_intent:
+        return None
+
+    # Explicit equations are handled separately.
+    if "=" in question:
+        return None
+
+    solve_all = bool(
+        re.search(
+            r"\b(all|every|each|tất cả|toàn bộ)\b",
+            question_lower,
+        )
+    )
+
+    equations = load_equations()
+    solutions = []
+
+    for equation in equations:
+        expression = equation.get("equation", "").strip()
+
+        if "=" not in expression:
+            continue
+
+        try:
+            result = solve_linear_steps(expression)
+        except ValueError:
+            continue
+
+        solutions.append({
+            **result,
+            "source_equation_id": equation["equation_id"],
+            "source_stroke_ids": equation.get("stroke_ids", []),
+            "source_bbox": equation.get("bbox", {}),
+        })
+
+    if not solutions:
+        return None
+
+    if solve_all:
+        return {
+            "action": "write_multiple_math_steps",
+            "solutions": solutions,
+        }
+
+    # Keep existing single-equation behavior.
+    if len(solutions) == 1:
+        return solutions[0]
+
+    # Multiple equations exist, but user did not
+    # explicitly request solving all of them.
+    return None
+  
 @router.post(
     "/chat",
     response_model=ChatResponse,
@@ -268,11 +362,13 @@ async def chat(
 
     # First check whether the user explicitly
     # asked the chatbot to write math.
-    visual_action = (
-        extract_write_math_action(
-            question
-        )
-    )
+    visual_action = extract_solve_math_action(question)
+
+    if visual_action is None:
+        visual_action = extract_whiteboard_solve_action(question)
+
+    if visual_action is None:
+        visual_action = extract_write_math_action(question)
 
     
 
@@ -871,7 +967,8 @@ IMPORTANT:
         question,
         combined_context,
     )
-
+    print("[CHAT DEBUG] Question:", question)
+    print("[CHAT DEBUG] Visual action:", visual_action)
     # ============================================================
     # 8. RESPONSE
     # ============================================================

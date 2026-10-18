@@ -13,6 +13,7 @@ from app.services.room_presence import (
 from app.api.routes import (
     analyze,
     chat,
+    # agent,
     health,
     history,
     state,
@@ -135,6 +136,11 @@ app.include_router(
     whiteboard_state.router,
     prefix="/api",
 )
+
+# app.include_router(
+#     agent.router,
+#     prefix="/api",
+# )
 
 
 @app.get("/")
