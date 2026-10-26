@@ -12,6 +12,16 @@ load_dotenv(BACKEND_DIR / ".env")
 
 @dataclass(frozen=True)
 class Settings:
+    llm_provider: str = os.getenv(
+        "LLM_PROVIDER",
+        "openai",
+    )
+
+    openai_model: str = os.getenv(
+        "OPENAI_MODEL",
+        "gpt-4.1",
+    )
+
     backend_host: str = os.getenv(
         "BACKEND_HOST",
         "10.255.0.11",

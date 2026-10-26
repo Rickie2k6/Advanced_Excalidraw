@@ -1,0 +1,25 @@
+# Local credentials and environments
+.env
+.env.local
+.env.*.local
+.venv/
+venv/
+
+# Installed dependencies
+node_modules/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Desktop metadata and editor temporary files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Local debug output
+backend/backend-debug.log

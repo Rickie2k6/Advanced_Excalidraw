@@ -401,7 +401,7 @@ export async function sendMessage(
 
     const response =
       await fetch(
-        "/api/chat",
+        "/talk-sketch/api/chat",
         {
           method: "POST",
           body: formData,
@@ -534,14 +534,17 @@ export async function sendMessage(
           // vị trí trên whiteboard.
           // ========================================================
 
-          const result = await bridge.writeMath({
-            expression,
-          });
-
-          if (!result?.success) {
-            throw new Error(
-              result?.error ?? "Failed to write math.",
-            );
+          try {
+            const result = await bridge.writeMath({ expression });
+            if (!result?.success) {
+              throw new Error(result?.error ?? "Failed to write math.");
+            }
+          } catch (error) {
+            console.error("[Chatbot] Math rendering failed:", error);
+            const renderError = new Error("Math rendering failed.");
+            renderError.userMessage =
+              "Mình chưa đọc được công thức này, bạn thử viết lại nhé.";
+            throw renderError;
           }
         } else {
           console.error(
@@ -784,9 +787,9 @@ export async function sendMessage(
 
     addMessage(
       messages,
-      backendResponded
+      error.userMessage ?? (backendResponded
         ? `Đã nhận phản hồi từ backend nhưng xảy ra lỗi xử lý: ${error.message}`
-        : `Không thể hoàn tất yêu cầu tới chatbot backend: ${error.message}`,
+        : `Không thể hoàn tất yêu cầu tới chatbot backend: ${error.message}`),
       false,
     );
 

@@ -1,2 +1,2 @@
-export const API_CHAT_URL = "/chatbot-api/chat";
-export const API_HISTORY_URL = "/chatbot-api/history";
+export const API_CHAT_URL = "/talk-sketch/chatbot-api/chat";
+export const API_HISTORY_URL = "/talk-sketch/chatbot-api/history";

@@ -91,7 +91,7 @@ export async function confirmPublicIPv4(
   publicIPv4
 ) {
   const response = await fetch(
-    "/chatbot-api/client-ip/confirm",
+    "/talk-sketch/chatbot-api/client-ip/confirm",
     {
       method: "POST",
 

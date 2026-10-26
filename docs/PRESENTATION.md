@@ -17,9 +17,9 @@ Say: “Here is a math problem where I have started the work but left the next s
 
 **Explain what it demonstrates.** Say: “The system processes the whiteboard content and places feedback near the work it refers to.” Use this wording after an autonomous run has been verified. If you must copy the hint from chat onto the canvas, demonstrate that step openly and say instead: “The chatbot generates a hint. Placing that feedback beside the relevant work automatically is a feature under development.”
 
-**Tools used.** PaddleOCR-VL recognizes the handwritten math, and the OpenAI Responses API (`generate_reply`) generates the chat response from the question and whiteboard context. A separate `GET /api/whiteboard/hints` endpoint uses the equation relationship graph, frontier detection, and SymPy-based next-step reasoning to produce tutoring instructions with the relevant equation’s bounding box. That endpoint is not called by the current chat flow. The widget still needs a canvas text-annotation action to place the hint beside the sketch automatically.
+**Tools used.** PaddleOCR-VL recognizes the handwritten math, and the Claude Messages API (`generate_reply`) generates the chat response from the question and whiteboard context. A separate `GET /api/whiteboard/hints` endpoint uses the equation relationship graph, frontier detection, and SymPy-based next-step reasoning to produce tutoring instructions with the relevant equation’s bounding box. That endpoint is not called by the current chat flow. The widget still needs a canvas text-annotation action to place the hint beside the sketch automatically.
 
-Presenter wording: “PaddleOCR reads the handwritten math, and OpenAI generates the chat feedback. We also have a separate SymPy-based hint pipeline that identifies the next algebra step. Connecting that hint to automatic canvas placement is under development.”
+Presenter wording: “PaddleOCR reads the handwritten math, and Claude generates the chat feedback. We also have a separate SymPy-based hint pipeline that identifies the next algebra step. Connecting that hint to automatic canvas placement is under development.”
 
 ## 2. Circle the appropriate emotion in an image
 
@@ -33,9 +33,9 @@ Say: “This image contains several facial expressions. I will ask the agent to 
 
 **Explain what it demonstrates.** Say: “This demonstrates visual understanding and an action on the whiteboard.” If you must identify the face or draw or reposition the circle yourself, say: “Automatic identification and accurate circle placement are features under development,” and identify the step you performed manually.
 
-**Tools used.** The OpenAI Responses API analyzes the inserted image (`analyze_inserted_image`), interprets the requested target (`extract_visual_target`), and selects among detected candidates (`select_visual_candidate`). Grounding DINO (`IDEA-Research/grounding-dino-tiny`), loaded through Hugging Face Transformers and PyTorch, proposes bounding boxes for the target. The geometry helper `image_bbox_to_excalidraw` converts the selected image coordinates into canvas coordinates. The backend returns a `circle` action, and the widget calls the Excalidraw bridge’s `addEllipse` method to draw it.
+**Tools used.** The Claude Messages API analyzes the inserted image (`analyze_inserted_image`), interprets the requested target (`extract_visual_target`), and selects among detected candidates (`select_visual_candidate`). Grounding DINO (`IDEA-Research/grounding-dino-tiny`), loaded through Hugging Face Transformers and PyTorch, proposes bounding boxes for the target. The geometry helper `image_bbox_to_excalidraw` converts the selected image coordinates into canvas coordinates. The backend returns a `circle` action, and the widget calls the Excalidraw bridge’s `addEllipse` method to draw it.
 
-Presenter wording: “OpenAI interprets the image and request, Grounding DINO locates candidate faces, and OpenAI selects the matching candidate. The Excalidraw bridge draws the circle at the selected location.”
+Presenter wording: “Claude interprets the image and request, Grounding DINO locates candidate faces, and Claude selects the matching candidate. The Excalidraw bridge draws the circle at the selected location.”
 
 ## 3. Let the chatbot agent solve a basic math equation
 
@@ -55,7 +55,7 @@ x = 2
 
 **Explain what it demonstrates.** Say: “The agent reads the problem, determines the solution steps, and writes them directly on the canvas.” If you must retype the equation in chat or move the generated steps below the input, say: “Reading the handwritten equation and placing its solution directly below it are features under development,” specifying which step needed assistance.
 
-**Tools used.** PaddleOCR-VL recognizes the handwritten equation, which is stored in `data/equations.json`. For a request without an explicit equation, `extract_whiteboard_solve_action` selects the source only when exactly one recognized equation is stored. The local `solve_linear_steps` function uses SymPy to solve the equation and verify the generated steps, then returns a `write_math_steps` action. The widget calls the Excalidraw bridge’s `writeMath` method for each step. OpenAI generates the accompanying chat response; the local SymPy solver determines these solution steps. This solver currently supports one-variable linear equations with integer coefficients and an integer solution. Placement below the original handwriting still needs live verification.
+**Tools used.** PaddleOCR-VL recognizes the handwritten equation, which is stored in `data/equations.json`. For a request without an explicit equation, `extract_whiteboard_solve_action` selects the source only when exactly one recognized equation is stored. The local `solve_linear_steps` function uses SymPy to solve the equation and verify the generated steps, then returns a `write_math_steps` action. The widget calls the Excalidraw bridge’s `writeMath` method for each step. Claude generates the accompanying chat response; the local SymPy solver determines these solution steps. This solver currently supports one-variable linear equations with integer coefficients and an integer solution. Placement below the original handwriting still needs live verification.
 
 Presenter wording: “PaddleOCR reads the equation, SymPy solves it and checks the steps, and the Excalidraw bridge writes each step on the canvas.”
 

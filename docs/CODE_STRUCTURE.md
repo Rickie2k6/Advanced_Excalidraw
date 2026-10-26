@@ -73,7 +73,7 @@ Chatbot/
 │   │   │       ├── excalidraw_store.py # Proxy lưu/đọc bản chia sẻ
 │   │   │       └── health.py         # Kiểm tra sức khỏe backend
 │   │   ├── services/
-│   │   │   ├── openai_service.py     # Gọi AI trả lời và phân tích ảnh
+│   │   │   ├── claude_service.py     # Gọi Claude trả lời và phân tích ảnh
 │   │   │   ├── equation_context.py   # Xây dựng ngữ cảnh công thức
 │   │   │   ├── equation_ocr.py       # OCR cho công thức riêng lẻ
 │   │   │   ├── stroke_grouper.py     # Gom nét vẽ phía backend
@@ -159,7 +159,7 @@ Người dùng nhập tin nhắn
   → POST /api/chat (question, scene_json, ảnh whiteboard nếu có)
   → api/routes/chat.py
   → OCR + ngữ cảnh công thức + xử lý ảnh/đối tượng theo request
-  → services/openai_service.py sinh câu trả lời
+  → services/claude_service.py sinh câu trả lời
   → widget hiển thị Markdown qua Marked và DOMPurify
 ```
 
@@ -184,7 +184,7 @@ Nét vẽ → API strokes → gom nhóm công thức → OCR
 | Nội dung gửi backend và cách hiển thị câu trả lời | `widget/src/ui/chat/messages.js` |
 | Kết nối với bảng Excalidraw | `widget/src/integrations/excalidraw.js` và bridge của ứng dụng chủ |
 | Xử lý request chat | `backend/app/api/routes/chat.py` |
-| Cách gọi AI và xây dựng lời nhắc cho AI | `backend/app/services/openai_service.py` và phần dựng ngữ cảnh trong route chat |
+| Cách gọi AI và xây dựng lời nhắc cho AI | `backend/app/services/claude_service.py` và phần dựng ngữ cảnh trong route chat |
 | OCR và trích xuất công thức | `backend/app/services/paddle/`, `backend/app/services/equation_ocr.py` |
 | Logic gợi ý toán | `backend/app/reasoning/` |
 | Cấu hình backend hoặc đường dẫn dữ liệu | `backend/app/core/config.py`, `backend/app/core/paths.py` |

@@ -8,8 +8,11 @@ from PIL import Image
 from app.services.detector import (
     detect_target,
 )
+from app.services.feeling_chart import is_known_feeling_chart, resolve_feeling_label
 
 from app.services.math_agent import solve_linear_steps
+from app.services.math_commands import extract_write_math_action
+from app.services.whiteboard_math import extract_whiteboard_solve_action
 from app.services.equation_context import load_equations
 from app.services.visual_geometry import (
     image_bbox_to_excalidraw,
@@ -52,7 +55,7 @@ from app.utils.images import (
     upload_to_image,
 )
 
-from app.services.openai_service import (
+from app.services.llm_service import (
     generate_reply,
     analyze_inserted_image,
     extract_visual_target,
@@ -66,71 +69,6 @@ router = APIRouter()
 # ============================================================
 # WRITE MATH ACTION
 # ============================================================
-
-def extract_write_math_action(
-    question: str,
-):
-    """
-    Detect a simple request asking the chatbot
-    to write a mathematical expression onto
-    the Excalidraw whiteboard.
-
-    Examples:
-
-    English:
-    - Write 2x + 3 = 7 on the whiteboard
-    - Write the equation x = 5
-    - Write x + 1 = 2
-
-    Vietnamese:
-    - Viết 2x + 3 = 7 lên bảng
-    - Viết phương trình x = 5 lên bảng
-    """
-
-    normalized = question.strip()
-
-    patterns = [
-        # English
-        (
-            r"(?i)\bwrite\s+"
-            r"(?:the\s+equation\s+)?"
-            r"(.+?)"
-            r"(?:\s+on\s+(?:the\s+)?whiteboard)?$"
-        ),
-
-        # Vietnamese
-        (
-            r"(?i)\bviết\s+"
-            r"(?:phương\s+trình\s+)?"
-            r"(.+?)"
-            r"(?:\s+lên\s+bảng)?$"
-        ),
-    ]
-
-    for pattern in patterns:
-        match = re.search(
-            pattern,
-            normalized,
-        )
-
-        if not match:
-            continue
-
-        expression = (
-            match.group(1)
-            .strip()
-            .rstrip(".")
-        )
-
-        if not expression:
-            return None
-
-        return {
-            "action": "write_math",
-            "expression": expression,
-        }
-
-    return None
 
 def extract_solve_math_action(question: str):
     match = re.search(
@@ -158,73 +96,6 @@ def extract_solve_math_action(question: str):
         )
         return None
 
-def extract_whiteboard_solve_action(question: str) -> dict | None:
-    """
-    Solve recognized handwritten equations on the whiteboard.
-
-    - "Solve this equation": solve only when exactly one
-      valid equation exists.
-    - "Solve all equations": solve every valid equation.
-    """
-
-    question_lower = question.strip().lower()
-
-    solve_intent = bool(
-        re.search(r"\b(solve|giải)\b", question_lower)
-    )
-
-    if not solve_intent:
-        return None
-
-    # Explicit equations are handled separately.
-    if "=" in question:
-        return None
-
-    solve_all = bool(
-        re.search(
-            r"\b(all|every|each|tất cả|toàn bộ)\b",
-            question_lower,
-        )
-    )
-
-    equations = load_equations()
-    solutions = []
-
-    for equation in equations:
-        expression = equation.get("equation", "").strip()
-
-        if "=" not in expression:
-            continue
-
-        try:
-            result = solve_linear_steps(expression)
-        except ValueError:
-            continue
-
-        solutions.append({
-            **result,
-            "source_equation_id": equation["equation_id"],
-            "source_stroke_ids": equation.get("stroke_ids", []),
-            "source_bbox": equation.get("bbox", {}),
-        })
-
-    if not solutions:
-        return None
-
-    if solve_all:
-        return {
-            "action": "write_multiple_math_steps",
-            "solutions": solutions,
-        }
-
-    # Keep existing single-equation behavior.
-    if len(solutions) == 1:
-        return solutions[0]
-
-    # Multiple equations exist, but user did not
-    # explicitly request solving all of them.
-    return None
-  
 @router.post(
     "/chat",
     response_model=ChatResponse,
@@ -365,7 +236,9 @@ async def chat(
     visual_action = extract_solve_math_action(question)
 
     if visual_action is None:
-        visual_action = extract_whiteboard_solve_action(question)
+        visual_action = extract_whiteboard_solve_action(
+            question, load_equations(), analysis,
+        )
 
     if visual_action is None:
         visual_action = extract_write_math_action(question)
@@ -721,7 +594,14 @@ async def chat(
 
                 detections = []
 
-                if target_description:
+                known_chart = is_known_feeling_chart(str(image_path))
+                chart_detection = (
+                    resolve_feeling_label(visual_target.get("label"))
+                    if known_chart and visual_target.get("action") == "circle"
+                    else None
+                )
+
+                if target_description and not known_chart:
                     detections = (
                         await run_in_threadpool(
                             detect_target,
@@ -739,16 +619,19 @@ async def chat(
                 # Select correct DINO candidate
                 # -----------------------------------------------
 
-                selected_detection = None
+                selected_detection = chart_detection
 
-                if not detections:
+                if known_chart:
+                    print("[Feeling Chart] Label lookup:", selected_detection)
+
+                elif not detections:
                     print(
                         "[Selected Detection] "
                         "No Grounding DINO "
                         "candidates."
                     )
 
-                else:
+                elif not known_chart:
                     selected_detection = (
                         await run_in_threadpool(
                             select_visual_candidate,
@@ -764,80 +647,80 @@ async def chat(
                         selected_detection,
                     )
 
-                    matching_image_element = next(
-                        (
-                            element
-                            for element
-                            in image_elements
-                            if (
-                                element.get(
-                                    "fileId"
-                                )
-                                == file_id
+                matching_image_element = next(
+                    (
+                        element
+                        for element
+                        in image_elements
+                        if (
+                            element.get(
+                                "fileId"
                             )
-                        ),
-                        None,
+                            == file_id
+                        )
+                    ),
+                    None,
+                )
+
+                if (
+                    selected_detection
+                    is not None
+
+                    and matching_image_element
+                    is not None
+
+                    and original_width
+                    is not None
+
+                    and original_height
+                    is not None
+                ):
+                    excalidraw_target = (
+                        image_bbox_to_excalidraw(
+                            selected_detection[
+                                "bbox"
+                            ],
+                            matching_image_element,
+                            original_width,
+                            original_height,
+                        )
                     )
 
-                    if (
-                        selected_detection
-                        is not None
+                    print(
+                        "[Excalidraw Target]",
+                        excalidraw_target,
+                    )
 
-                        and matching_image_element
-                        is not None
+                    # Only create the image-related
+                    # visual action if write_math
+                    # has not already been selected.
+                    if visual_action is None:
+                        visual_action = {
+                            "action":
+                                visual_target.get(
+                                    "action"
+                                ),
 
-                        and original_width
-                        is not None
-
-                        and original_height
-                        is not None
-                    ):
-                        excalidraw_target = (
-                            image_bbox_to_excalidraw(
-                                selected_detection[
-                                    "bbox"
+                            "x":
+                                excalidraw_target[
+                                    "x"
                                 ],
-                                matching_image_element,
-                                original_width,
-                                original_height,
-                            )
-                        )
 
-                        print(
-                            "[Excalidraw Target]",
-                            excalidraw_target,
-                        )
+                            "y":
+                                excalidraw_target[
+                                    "y"
+                                ],
 
-                        # Only create the image-related
-                        # visual action if write_math
-                        # has not already been selected.
-                        if visual_action is None:
-                            visual_action = {
-                                "action":
-                                    visual_target.get(
-                                        "action"
-                                    ),
+                            "width":
+                                excalidraw_target[
+                                    "width"
+                                ],
 
-                                "x":
-                                    excalidraw_target[
-                                        "x"
-                                    ],
-
-                                "y":
-                                    excalidraw_target[
-                                        "y"
-                                    ],
-
-                                "width":
-                                    excalidraw_target[
-                                        "width"
-                                    ],
-
-                                "height":
-                                    excalidraw_target[
-                                        "height"
-                                    ],
-                            }
+                            "height":
+                                excalidraw_target[
+                                    "height"
+                                ],
+                        }
 
                 # -----------------------------------------------
                 # Vision result
@@ -959,7 +842,7 @@ IMPORTANT:
 """.strip()
 
     # ============================================================
-    # 7. OPENAI RESPONSE
+    # 7. LLM RESPONSE
     # ============================================================
 
     answer = await run_in_threadpool(

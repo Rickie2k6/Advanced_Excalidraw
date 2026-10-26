@@ -1,0 +1,8 @@
+{
+  "file_id": "e3b9d61b3e3f6f2253f31acf61e514f4ac850944",
+  "image_path": "data/whiteboard_images/e3b9d61b3e3f6f2253f31acf61e514f4ac850944.jpg",
+  "analysis": "# Feeling Chart Analysis\n\n## Overview\nThis is a **\"Feeling Chart\"** — an educational emotional literacy tool displaying 20 different emotions through cartoon emoji-style faces.\n\n## Layout & Design\n- **Title**: \"FEELING CHART\" in bold yellow text on a purple header\n- **Background**: White with a purple border\n- **Grid arrangement**: 5 rows × 4 columns of emoji faces\n- Each emotion has a **yellow circular emoji** above a **purple label badge**\n\n## All 20 Emotions Displayed (left to right, top to bottom)\n\n| Row | Emotions |\n|-----|----------|\n| 1 | AFRAID · SAD · WORRIED · HAPPY |\n| 2 | ASHAMED · DISTRACTED · EMBARRASSED · NERVOUS |\n| 3 | CONFIDENT · FRUSTRATED · GUILTY · LONELY |\n| 4 | EXHAUSTED · SURPRISED · SHY · CONFUSED |\n| 5 | PROUD · SHOCKED · ANGRY · OVERWHELMED |\n\n## Notable Visual Details\n- **SAD**: includes a blue teardrop\n- **NERVOUS**: shows sweat droplets\n- **CONFIDENT**: emoji has thumbs up gesture\n- **EXHAUSTED**: shows \"ZZZ\" sleep symbols\n- **EMBARRASSED/SHY**: feature rosy red cheeks\n- **ANGRY**: uniquely rendered in **red** instead of yellow\n- **SHOCKED**: tongue sticking out with wide eyes\n\n## Purpose\nDesigned as an **educational reference chart**, likely for children, to help identify and name emotional states.",
+  "provider": "claude",
+  "model": "claude-sonnet-4-6",
+  "timestamp": "2026-10-26T17:45:56.222370+00:00"
+}

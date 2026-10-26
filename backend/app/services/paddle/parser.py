@@ -192,7 +192,11 @@ def extract_formula_blocks(
             label
         )
 
-        if label not in FORMULA_LABELS:
+        equation = _clean_equation(block.get("block_content", ""))
+        # Paddle can classify a handwritten or typed equation as ordinary text.
+        # Keep equation candidates from those blocks for downstream validation.
+        text_equation = label == "text" and "=" in equation
+        if label not in FORMULA_LABELS and not text_equation:
             continue
 
         formulas.append({
@@ -204,13 +208,7 @@ def extract_formula_blocks(
                 )
             ),
 
-            "equation":
-                _clean_equation(
-                    block.get(
-                        "block_content",
-                        "",
-                    )
-                ),
+            "equation": equation,
 
             "block_id":
                 _safe_int(

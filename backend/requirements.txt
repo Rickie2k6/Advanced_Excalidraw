@@ -4,6 +4,7 @@ python-multipart
 python-dotenv
 httpx
 openai
+anthropic
 numpy
 pillow<12
 sympy

@@ -1,6 +1,6 @@
 # Excalidraw Chatbot
 
-This project provides an AI chatbot for an Excalidraw whiteboard. The chatbot can inspect the current board, recognize mathematical equations with PaddleOCR, and use the recognized whiteboard context to answer questions through an OpenAI model.
+This project provides an AI chatbot for an Excalidraw whiteboard. The chatbot can inspect the current board, recognize mathematical equations with PaddleOCR, and use the recognized whiteboard context to answer questions through the Claude API.
 
 ## Project components
 
@@ -22,7 +22,7 @@ flowchart TD
     G --> I[Backend optionally analyzes the full whiteboard image]
     H --> J[Combine the question and whiteboard context]
     I --> J
-    J --> K[OpenAI generates a response]
+    J --> K[Configured LLM generates a response]
     K --> L[Widget sanitizes and displays the Markdown response]
 ```
 
@@ -35,7 +35,7 @@ The main chat flow works as follows:
 5. The backend analyzes the supplied whiteboard image with PaddleOCR.
 6. The backend also loads previously recognized equations from `data/equations.json`, ordered by their position on the board.
 7. The full-board analysis and recognized equations are combined into the chatbot context.
-8. The question and context are sent to the configured OpenAI model.
+8. The question and context are sent to the configured LLM provider.
 9. The API returns the answer to the widget, which sanitizes and renders it as Markdown.
 
 ### Equation-processing workflow
@@ -78,7 +78,36 @@ python -m pip install -r backend/requirements.txt
 
 ### Configure and start the server
 
-The backend reads its settings from `backend/.env`. Make sure the environment contains the required configuration, including a valid `OPENAI_API_KEY`.
+The backend reads its settings from `backend/.env`. Use `backend/.env.example`
+as a template if that file does not already exist. Store real keys only in your
+local `.env` file:
+
+```dotenv
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+# CLAUDE_API_KEY=  # Alternative name for ANTHROPIC_API_KEY
+OPENAI_MODEL=gpt-4.1
+CLAUDE_MODEL=claude-sonnet-4-6
+LLM_PROVIDER=openai
+```
+
+Set either key to use that provider. With both keys set, `LLM_PROVIDER` selects
+the first provider (`openai` by default; `claude` or `anthropic` selects Claude).
+If its call raises an exception, the backend logs a warning and tries the other
+provider once. With neither key set, LLM calls raise a clear configuration error.
+Provider SDKs are imported only when needed.
+
+All four chat operations use `app/services/llm_service.py`, with shared prompts
+and output formats. `OPENAI_MODEL` defaults to the vision-capable `gpt-4.1`;
+choose another vision-capable model if overriding it, because the same model
+handles text and image calls. `CLAUDE_MODEL` defaults to `claude-sonnet-4-6`.
+Requests include provider and operation fields in `backend/logs/openai_requests.jsonl`
+or `backend/logs/claude_requests.jsonl`. Image analyses are cached separately
+for each provider and checked against the configured model.
+
+Do not commit API keys. Restart the backend after configuration changes.
+For command-line checks without starting the server, see
+[the LLM testing guide](docs/LLM_TESTING.md).
 
 From the project root, enter the backend directory and start the FastAPI server:
 
