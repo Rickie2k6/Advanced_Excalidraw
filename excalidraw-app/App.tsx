@@ -1,8 +1,8 @@
 //đây là command line chạy trong server: corepack yarn start --host 10.255.0.11
 /* gọi lệnh này để activate cái Cloudfkare Tunnel: ~/bin/cloudflared tunnel \
   --url http://10.255.0.11:65533*/
-  import PromptPage from "./PromptPage";
-  import {
+//sử dụng URL này: https://ronald-hughes-fifty-archives.trycloudflare.com
+import {
   Excalidraw,
   LiveCollaborationTrigger,
   TTDDialogTrigger,
@@ -12,19 +12,9 @@
   ExcalidrawAPIProvider,
   useExcalidrawAPI,
   exportToBlob,
-  convertToExcalidrawElements,
 } from "@excalidraw/excalidraw";
 import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
-import {
-  expressionToFreedraw,
-  measureMathExpression,
-} from "./math-freedraw";
-import { animateMathHandwriting } from "./math-handwriting-animation";
-import {
-  findAvailablePosition,
-  estimateMathSize,
-} from "./math-placement";
 import {
   CommandPalette,
   DEFAULT_CATEGORIES,
@@ -51,10 +41,6 @@ import polyfill from "@excalidraw/excalidraw/polyfill";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
 import { t } from "@excalidraw/excalidraw/i18n";
-
-import {
-  isFreeDrawElement,
-} from "@excalidraw/element";
 
 import {
   GithubIcon,
@@ -429,157 +415,9 @@ type EquationGroupResponse = {
   count: number;
   equations: Record<string, EquationGroup>;
 };
-
-
-type WhiteboardHint = {
-  anchor_equation_id: string;
-  equation: string;
-
-  bbox: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null;
-
-  next_step: {
-    valid: boolean;
-    status: string;
-    operation: string | null;
-    value: string | null;
-    goal: string | null;
-  };
-
-  instruction: string;
-};
-
-type WhiteboardHintsResponse = {
-  success: boolean;
-  equation_count: number;
-  hints: WhiteboardHint[];
-};
-
-type WhiteboardElementSnapshot = {
-  id: string;
-  type: string;
-
-  x: number;
-  y: number;
-
-  width: number;
-  height: number;
-
-  angle: number;
-  version: number;
-
-  isDeleted: boolean;
-};
-
-type WhiteboardActionPayload = {
-  action:
-    | "create"
-    | "move"
-    | "resize"
-    | "update"
-    | "delete";
-
-  element_id: string;
-  element_type: string;
-
-  data?: Record<string, unknown>;
-};
-
-type HintViewport = {
-  scrollX: number;
-  scrollY: number;
-  zoom: number;
-  offsetLeft: number;
-  offsetTop: number;
-};
-
-const getOrCreateContributorId = () => {
-  const storageKey =
-    "excalidraw_contributor_id";
-
-  let contributorId =
-    localStorage.getItem(storageKey);
-
-  if (!contributorId) {
-    contributorId =
-      crypto.randomUUID();
-
-    localStorage.setItem(
-      storageKey,
-      contributorId,
-    );
-  }
-
-  return contributorId;
-};
 // gọi chatbot-widget.js
 const ExcalidrawWrapper = () => {
   const excalidrawAPI = useExcalidrawAPI();
-
-  const contributorIdRef =
-    useRef(
-      getOrCreateContributorId(),
-    );
-  // ============================================================
-  // WHITEBOARD TUTOR HINTS
-  // ============================================================
-
-  const hintOverlayRootRef =
-    useRef<HTMLDivElement>(null);
-
-  const [whiteboardHints, setWhiteboardHints] =
-    useState<WhiteboardHint[]>([]);
-
-  const [hintViewport, setHintViewport] =
-    useState<HintViewport>({
-      scrollX: 0,
-      scrollY: 0,
-      zoom: 1,
-      offsetLeft: 0,
-      offsetTop: 0,
-    });
-
-  const refreshWhiteboardHints =
-    useCallback(async () => {
-      try {
-        const response = await fetch(
-          `${CHATBOT_BACKEND_URL}/api/whiteboard/hints`,
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Whiteboard hints failed: ${response.status}`,
-          );
-        }
-
-        const data =
-          (await response.json()) as WhiteboardHintsResponse;
-
-        setWhiteboardHints(
-          data.hints ?? [],
-        );
-
-        console.log(
-          "[Whiteboard Hints]",
-          data.hints,
-        );
-      } catch (error) {
-        console.error(
-          "[Whiteboard Hints] Failed:",
-          error,
-        );
-      }
-    }, []);
-
-
-  // Load existing hints when app opens.
-  useEffect(() => {
-    void refreshWhiteboardHints();
-  }, [refreshWhiteboardHints]);
 
 useEffect(() => {
   const initializePublicIPv4 = async () => {
@@ -629,356 +467,6 @@ useEffect(() => {
   const localFreedrawIdsRef = useRef<Set<string>>(
     new Set(),
   );
-  // ============================================================
-  // WHITEBOARD IMAGE SYNC
-  // ============================================================
-
-  // Images đã upload thành công
-  const uploadedImageFileIdsRef =
-    useRef<Set<FileId>>(new Set());
-
-  // Images đang upload.
-  // Dùng cái này để tránh onChange upload cùng image nhiều lần.
-  const imageUploadsInFlightRef =
-    useRef<Set<FileId>>(new Set());
-  
-  const whiteboardStateSyncTimerRef =
-  useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  // ============================================================
-  // WHITEBOARD ACTION HISTORY
-  // ============================================================
-
-  const previousActionElementsRef =
-    useRef<Map<string, WhiteboardElementSnapshot>>(
-      new Map(),
-    );
-
-  const actionLogInitializedRef =
-    useRef(false);
-
-  const actionLogTimerRef =
-    useRef<ReturnType<typeof setTimeout> | null>(
-      null,
-    );
-
-    // ============================================================
-  // SEND WHITEBOARD ACTION TO BACKEND
-  // ============================================================
-
-  const sendWhiteboardAction = (
-    payload: WhiteboardActionPayload,
-  ) => {
-    void fetch(
-      `${CHATBOT_BACKEND_URL}/api/whiteboard/action`,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify(payload),
-      },
-    )
-      .then(async (response) => {
-        if (!response.ok) {
-          console.error(
-            "[Whiteboard Action] Failed:",
-            response.status,
-            await response.text(),
-          );
-
-          return;
-        }
-
-        console.log(
-          "[Whiteboard Action]",
-          payload.action,
-          payload.element_id,
-        );
-      })
-      .catch((error) => {
-        console.error(
-          "[Whiteboard Action] Request failed:",
-          error,
-        );
-      });
-  };
-
-
-  // ============================================================
-  // CREATE ACTION SNAPSHOT
-  // ============================================================
-
-  const createActionSnapshot = (
-    element: OrderedExcalidrawElement,
-  ): WhiteboardElementSnapshot => {
-    return {
-      id: element.id,
-      type: element.type,
-
-      x: element.x,
-      y: element.y,
-
-      width: element.width,
-      height: element.height,
-
-      angle: element.angle ?? 0,
-      version: element.version ?? 0,
-
-      isDeleted:
-        element.isDeleted ?? false,
-    };
-  };
-
-
-  // ============================================================
-  // PROCESS WHITEBOARD ACTIONS
-  // ============================================================
-
-  const processWhiteboardActions = (
-    elements:
-      readonly OrderedExcalidrawElement[],
-  ) => {
-    const currentElements =
-      new Map<
-        string,
-        WhiteboardElementSnapshot
-      >();
-
-    for (const element of elements) {
-      const current =
-        createActionSnapshot(element);
-
-      currentElements.set(
-        current.id,
-        current,
-      );
-
-      const previous =
-        previousActionElementsRef.current.get(
-          current.id,
-        );
-
-      // CREATE
-      if (!previous) {
-        if (!current.isDeleted) {
-          sendWhiteboardAction({
-            action: "create",
-
-            element_id: current.id,
-            element_type: current.type,
-
-            data: {
-              x: current.x,
-              y: current.y,
-
-              width: current.width,
-              height: current.height,
-
-              angle: current.angle,
-              version: current.version,
-            },
-          });
-        }
-
-        continue;
-      }
-
-      // DELETE
-      if (
-        !previous.isDeleted &&
-        current.isDeleted
-      ) {
-        sendWhiteboardAction({
-          action: "delete",
-
-          element_id: current.id,
-          element_type: current.type,
-
-          data: {
-            previous,
-          },
-        });
-
-        continue;
-      }
-
-      if (
-        current.isDeleted ||
-        previous.isDeleted
-      ) {
-        continue;
-      }
-
-      // No change
-      if (
-        current.version ===
-        previous.version
-      ) {
-        continue;
-      }
-
-      const moved =
-        current.x !== previous.x ||
-        current.y !== previous.y;
-
-      const resized =
-        current.width !== previous.width ||
-        current.height !== previous.height;
-
-      // RESIZE
-      if (resized) {
-        sendWhiteboardAction({
-          action: "resize",
-
-          element_id: current.id,
-          element_type: current.type,
-
-          data: {
-            before: {
-              x: previous.x,
-              y: previous.y,
-
-              width: previous.width,
-              height: previous.height,
-            },
-
-            after: {
-              x: current.x,
-              y: current.y,
-
-              width: current.width,
-              height: current.height,
-            },
-
-            version: current.version,
-          },
-        });
-
-        continue;
-      }
-
-      // MOVE
-      if (moved) {
-        sendWhiteboardAction({
-          action: "move",
-
-          element_id: current.id,
-          element_type: current.type,
-
-          data: {
-            from: {
-              x: previous.x,
-              y: previous.y,
-            },
-
-            to: {
-              x: current.x,
-              y: current.y,
-            },
-
-            version: current.version,
-          },
-        });
-
-        continue;
-      }
-
-      // OTHER UPDATE
-      sendWhiteboardAction({
-        action: "update",
-
-        element_id: current.id,
-        element_type: current.type,
-
-        data: {
-          version: current.version,
-        },
-      });
-    }
-
-    // Detect element removed completely
-    for (
-      const [previousId, previous]
-      of previousActionElementsRef.current
-    ) {
-      if (
-        !currentElements.has(previousId) &&
-        !previous.isDeleted
-      ) {
-        sendWhiteboardAction({
-          action: "delete",
-
-          element_id: previous.id,
-          element_type: previous.type,
-
-          data: {
-            previous,
-          },
-        });
-      }
-    }
-
-    previousActionElementsRef.current =
-      currentElements;
-  };
-
-
-  // ============================================================
-  // TRACK WHITEBOARD ACTIONS
-  // ============================================================
-
-  const trackWhiteboardActions = (
-    elements:
-      readonly OrderedExcalidrawElement[],
-  ) => {
-    const snapshot = [...elements];
-
-    // First call only establishes baseline.
-    if (
-      !actionLogInitializedRef.current
-    ) {
-      previousActionElementsRef.current =
-        new Map(
-          snapshot.map(
-            (element) => [
-              element.id,
-              createActionSnapshot(element),
-            ],
-          ),
-        );
-
-      actionLogInitializedRef.current =
-        true;
-
-      console.log(
-        "[Whiteboard Action] Initial snapshot:",
-        snapshot.length,
-        "element(s)",
-      );
-
-      return;
-    }
-
-    if (actionLogTimerRef.current) {
-      clearTimeout(
-        actionLogTimerRef.current,
-      );
-    }
-
-    actionLogTimerRef.current =
-      setTimeout(() => {
-        actionLogTimerRef.current =
-          null;
-
-        processWhiteboardActions(
-          snapshot,
-        );
-      }, 300);
-  };
 
   // ============================================================
   // EQUATION GROUP -> PNG -> PADDLE OCR
@@ -1169,11 +657,6 @@ useEffect(() => {
               ocrResult.equation,
             );
           }
-          // --------------------------------------------
-          // 5. Refresh tutoring hints after OCR
-          // --------------------------------------------
-          await refreshWhiteboardHints();
-
         } while (
           equationPipelinePendingRef.current
         );
@@ -1186,7 +669,7 @@ useEffect(() => {
         equationPipelineRunningRef.current =
           false;
       }
-    }, [excalidrawAPI, refreshWhiteboardHints]);
+    }, [excalidrawAPI]);
 
 
   const scheduleEquationOcr =
@@ -1233,47 +716,38 @@ useEffect(() => {
 
       strokeSyncTimerRef.current =
         setTimeout(async () => {
-          const strokes = snapshot.flatMap(
-            (element) => {
-              if (
-                element.type !== "freedraw" ||
-                element.isDeleted ||
-                element.customData?.createdByAgent === true
-              ) {
-                return [];
-              }
+          const strokes = snapshot
+            .filter(
+              (element) =>
+                element.type === "freedraw",
+            )
+            .map((element) => ({
+              stroke_id: element.id,
 
-              return [
-                {
-                  stroke_id: element.id,
+              created_by_ip:
+                element.customData
+                  ?.createdByIp ??
+                null,
 
-                  contributor_id:
-                    element.customData
-                      ?.createdByContributorId ??
-                    null,
+              x: element.x,
+              y: element.y,
 
-                  created_by_ip:
-                    element.customData
-                      ?.createdByIp ??
-                    null,
+              width: element.width,
+              height: element.height,
 
-                  x: element.x,
-                  y: element.y,
+              points:
+                element.points.map(
+                  (point) =>
+                    Array.from(point),
+                ),
 
-                  width: element.width,
-                  height: element.height,
+              is_deleted:
+                element.isDeleted,
+            }));
 
-                  points:
-                    element.points.map(
-                      (point) =>
-                        Array.from(point),
-                    ),
-
-                  is_deleted: false,
-                }
-              ];
-            },
-          );
+          if (!strokes.length) {
+            return;
+          }
 
           try {
             const response = await fetch(
@@ -1302,9 +776,7 @@ useEffect(() => {
               "[Stroke Sync]",
               `${strokes.length} stroke(s) saved`,
             );
-            if (strokes.length > 0) {
-              scheduleEquationOcr();
-            }
+            scheduleEquationOcr();
             
           } catch (error) {
             console.error(
@@ -1331,14 +803,7 @@ useEffect(() => {
     };
   }, []);
 
-  // ============================================================
-  // JARVIS HANDWRITING ANIMATION QUEUE
-  // ============================================================
-
-  const handwritingQueueRef = useRef<Promise<void>>(
-      Promise.resolve(),
-    );
-  /**
+/**
    * EN:
    * Expose the minimum Excalidraw functionality required by the
    * external chatbot. The chatbot can read the current scene and
@@ -1354,7 +819,6 @@ useEffect(() => {
       return;
     }
 
-    
     const bridge = {
       /**
        * EN:
@@ -1366,396 +830,8 @@ useEffect(() => {
       getScene() {
         return {
           elements: excalidrawAPI.getSceneElements(),
-          appState: excalidrawAPI.getAppState(),
-          files: excalidrawAPI.getFiles(),
         };
       },
-
-      addEllipse({
-        x,
-        y,
-        width,
-        height,
-      }: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-      }) {
-        const currentElements =
-          excalidrawAPI.getSceneElements();
-
-        const [ellipse] =
-          convertToExcalidrawElements([
-            {
-              type: "ellipse",
-              x,
-              y,
-              width,
-              height,
-              strokeColor: "#e03131",
-              backgroundColor: "transparent",
-              fillStyle: "solid",
-              strokeWidth: 1,
-              strokeStyle: "solid",
-              roughness: 1,
-              opacity: 100,
-            },
-          ]);
-
-        excalidrawAPI.updateScene({
-          elements: [
-            ...currentElements,
-            ellipse,
-          ],
-          captureUpdate:
-            CaptureUpdateAction.NEVER,
-        });
-
-        console.log(
-          "[Chatbot] Added ellipse:",
-          ellipse,
-        );
-
-        return ellipse;
-      },
-
-      
-      
-      writeMath({
-        expression,
-        x,
-        y,
-        anchorElementIds,
-        solutionGroupId,
-        actionId,
-      }: {
-        expression: string;
-        x?: number;
-        y?: number;
-        anchorElementIds?: string[];
-        solutionGroupId?: string;
-        actionId?: string;
-      }) {
-        const run = async () => {
-          // 1. Validate input
-          if (!expression?.trim()) {
-            throw new Error("Math expression is empty.");
-          }
-
-          if ((x === undefined) !== (y === undefined)) {
-            throw new Error(
-              "Provide both x and y, or neither.",
-            );
-          }
-
-          if (
-            x !== undefined &&
-            (!Number.isFinite(x) || !Number.isFinite(y))
-          ) {
-            throw new Error("Invalid coordinates.");
-          }
-
-          // 2. Read the latest scene inside the queue
-          const currentElements =
-            excalidrawAPI.getSceneElements();
-
-          const { width, height } =
-            measureMathExpression(expression);
-
-          if (!(width > 0 && height > 0)) {
-            throw new Error("Invalid math dimensions.");
-          }
-
-          // 3. Collision detection
-          const padding = 16;
-
-          const collides = (px: number, py: number) =>
-            currentElements.some(
-              (element) =>
-                !element.isDeleted &&
-                px < element.x + element.width + padding &&
-                px + width + padding > element.x &&
-                py < element.y + element.height + padding &&
-                py + height + padding > element.y,
-            );
-
-          // 4. Determine placement
-          let position: { x: number; y: number };
-
-          if (x !== undefined && y !== undefined) {
-            position = { x, y };
-
-            if (collides(x, y)) {
-              throw new Error(
-                "Requested position overlaps existing elements.",
-              );
-            }
-          } else if (anchorElementIds?.length) {
-            const anchorIds = new Set(anchorElementIds);
-
-            const anchors = currentElements.filter(
-              (element) =>
-                !element.isDeleted &&
-                anchorIds.has(element.id),
-            );
-
-            if (anchors.length !== anchorIds.size) {
-              throw new Error(
-                "Some anchor elements are missing from the scene.",
-              );
-            }
-
-            const left = Math.min(
-              ...anchors.map((element) => element.x),
-            );
-
-            const bottom = Math.max(
-              ...anchors.map(
-                (element) => element.y + element.height,
-              ),
-            );
-
-            position = {
-              x: left,
-              y: bottom + 24,
-            };
-
-            let attempts = 0;
-
-            while (
-              collides(position.x, position.y) &&
-              attempts < 100
-            ) {
-              position.y += Math.max(
-                height + padding,
-                24,
-              );
-              attempts++;
-            }
-
-            if (collides(position.x, position.y)) {
-              throw new Error(
-                "No free space below anchor elements.",
-              );
-            }
-          } else {
-            position = findAvailablePosition(
-              currentElements,
-              width,
-              height,
-            );
-
-            if (collides(position.x, position.y)) {
-              throw new Error(
-                "Automatic placement overlaps existing elements.",
-              );
-            }
-          }
-
-          // 5. Generate native freedraw strokes
-          const rawStrokes = expressionToFreedraw(
-            expression,
-            position.x,
-            position.y,
-          );
-
-          if (!rawStrokes.length) {
-            throw new Error(
-              "Expression generated no drawing strokes.",
-            );
-          }
-
-          
-          
-          
-          
-          const converted = convertToExcalidrawElements(
-            rawStrokes.map((stroke) => ({
-              ...stroke,
-              type: "freedraw" as const,
-            })) as unknown as NonNullable<
-              Parameters<typeof convertToExcalidrawElements>[0]
-            >,
-          );
-
-
-
-
-
-          if (!converted.length) {
-            throw new Error(
-              "Failed to create Excalidraw elements.",
-            );
-          }
-
-          // 6. Normalize elements and attach metadata
-          const mathElements = converted.map((element) => ({
-            ...element,
-            version:
-              Number.isInteger(element.version) &&
-              element.version >= 0
-                ? element.version
-                : 1,
-            versionNonce: Number.isInteger(
-              element.versionNonce,
-            )
-              ? element.versionNonce
-              : Math.floor(Math.random() * 2 ** 31),
-            isDeleted: false as const,
-            customData: {
-              ...element.customData,
-              createdByAgent: true,
-              agentSolutionGroupId: solutionGroupId ?? null,
-              agentActionId: actionId ?? null,
-            },
-          }));
-
-          const invalidElements = mathElements.filter(
-            (element) =>
-              !Number.isInteger(element.version) ||
-              element.version < 0 ||
-              !Number.isInteger(element.versionNonce),
-          );
-
-          if (invalidElements.length > 0) {
-            throw new Error(
-              "Generated elements have invalid versions.",
-            );
-          }
-
-          const elementIds = mathElements.map(
-            (element) => element.id,
-          );
-
-          const allIds = [
-            ...excalidrawAPI
-              .getSceneElementsIncludingDeleted()
-              .map((element) => element.id),
-            ...elementIds,
-          ];
-
-          if (new Set(allIds).size !== allIds.length) {
-            throw new Error(
-              "Duplicate Excalidraw element IDs detected.",
-            );
-          }
-
-          // 7. Get the overlay container
-          const container = hintOverlayRootRef.current;
-
-          if (!container) {
-            throw new Error(
-              "Handwriting overlay container is missing.",
-            );
-          }
-
-          // 8. Animate handwriting, then commit
-          await animateMathHandwriting({
-            container,
-
-            strokes: mathElements.map((element) => {
-              if (element.type !== "freedraw") {
-                throw new Error(
-                  "Expected freedraw element.",
-                );
-              }
-
-              return {
-                x: element.x,
-                y: element.y,
-                points: element.points.map(
-                  (point) =>
-                    [point[0], point[1]] as const,
-                ),
-                strokeColor: element.strokeColor,
-                strokeWidth: element.strokeWidth,
-              };
-            }),
-
-            getViewport: () => {
-              const state = excalidrawAPI.getAppState();
-
-              return {
-                scrollX: state.scrollX,
-                scrollY: state.scrollY,
-                zoom: Number(state.zoom?.value ?? 1),
-                offsetLeft: state.offsetLeft ?? 0,
-                offsetTop: state.offsetTop ?? 0,
-              };
-            },
-
-            durationPerStroke: 180,
-
-            // Called while SVG overlay is still visible.
-            onComplete: () => {
-              const latestElements =
-                excalidrawAPI
-                  .getSceneElementsIncludingDeleted();
-
-              const latestIds = new Set(
-                latestElements.map(
-                  (element) => element.id,
-                ),
-              );
-
-              if (
-                elementIds.some((id) => latestIds.has(id))
-              ) {
-                throw new Error(
-                  "Generated element IDs already exist.",
-                );
-              }
-
-              excalidrawAPI.updateScene({
-                elements: [
-                  ...latestElements,
-                  ...mathElements,
-                ],
-                captureUpdate:
-                  CaptureUpdateAction.IMMEDIATELY,
-              });
-            },
-          });
-
-          // 9. Verify committed elements
-          const sceneIds = new Set(
-            excalidrawAPI
-              .getSceneElements()
-              .map((element) => element.id),
-          );
-
-          const success = elementIds.every(
-            (id) => sceneIds.has(id),
-          );
-
-          return {
-            success,
-            expression,
-            element_ids: elementIds,
-            position,
-            width,
-            height,
-            error: success
-              ? null
-              : "Generated elements not found in scene.",
-          };
-        };
-
-        // 10. Queue each handwriting request
-        const pending =
-          handwritingQueueRef.current.then(run);
-
-        // Keep the queue alive even if one request fails.
-        handwritingQueueRef.current = pending.then(
-          () => undefined,
-          () => undefined,
-        );
-
-        return pending;
-      },
-
-
 
       async exportWhiteboardToPng() {
         const elements =
@@ -2273,315 +1349,18 @@ useEffect(() => {
   }, [excalidrawAPI]);
 
 
-  // ============================================================
-  // SYNC INSERTED IMAGES TO CHATBOT BACKEND
-  // ============================================================
 
-  const syncImagesToBackend = useCallback(
-    async (
-      elements: readonly OrderedExcalidrawElement[],
-      files: BinaryFiles,
-    ) => {
-      for (const element of elements) {
-        // Chỉ xử lý image đã được Excalidraw initialize
-        if (
-          !isInitializedImageElement(element) ||
-          element.isDeleted
-        ) {
-          continue;
-        }
-
-        const fileId = element.fileId;
-
-        // Đã upload rồi -> bỏ qua
-        if (
-          uploadedImageFileIdsRef.current.has(fileId)
-        ) {
-          continue;
-        }
-
-        // Đang upload -> bỏ qua để tránh duplicate request
-        if (
-          imageUploadsInFlightRef.current.has(fileId)
-        ) {
-          continue;
-        }
-
-        const imageFile = files[fileId];
-
-        // Image data chưa available
-        if (!imageFile?.dataURL) {
-          continue;
-        }
-
-        imageUploadsInFlightRef.current.add(fileId);
-
-        try {
-          // ----------------------------------------------------
-          // 1. Convert Excalidraw dataURL -> actual binary Blob
-          // ----------------------------------------------------
-
-          const blobResponse = await fetch(
-            imageFile.dataURL,
-          );
-
-          if (!blobResponse.ok) {
-            throw new Error(
-              `Could not convert image ${fileId} to Blob`,
-            );
-          }
-
-          const blob = await blobResponse.blob();
-
-          // ----------------------------------------------------
-          // 2. Determine file extension
-          // ----------------------------------------------------
-
-          let extension = "png";
-
-          switch (imageFile.mimeType) {
-            case "image/jpeg":
-              extension = "jpg";
-              break;
-
-            case "image/webp":
-              extension = "webp";
-              break;
-
-            case "image/svg+xml":
-              extension = "svg";
-              break;
-
-            case "image/png":
-            default:
-              extension = "png";
-              break;
-          }
-
-          // ----------------------------------------------------
-          // 3. Build multipart/form-data
-          // ----------------------------------------------------
-
-          const formData = new FormData();
-
-          formData.append(
-            "image",
-            blob,
-            `${fileId}.${extension}`,
-          );
-
-          formData.append(
-            "file_id",
-            fileId,
-          );
-
-          formData.append(
-            "element_id",
-            element.id,
-          );
-
-          formData.append(
-            "mime_type",
-            imageFile.mimeType,
-          );
-
-          formData.append(
-            "x",
-            String(element.x),
-          );
-
-          formData.append(
-            "y",
-            String(element.y),
-          );
-
-          formData.append(
-            "width",
-            String(element.width),
-          );
-
-          formData.append(
-            "height",
-            String(element.height),
-          );
-
-          // ----------------------------------------------------
-          // 4. Send actual image to FastAPI
-          // ----------------------------------------------------
-
-          const response = await fetch(
-            `${CHATBOT_BACKEND_URL}/api/whiteboard/images`,
-            {
-              method: "POST",
-              body: formData,
-            },
-          );
-
-          if (!response.ok) {
-            const errorText =
-              await response.text();
-
-            throw new Error(
-              `Image upload failed: ${response.status} ${errorText}`,
-            );
-          }
-
-          const result =
-            await response.json();
-
-          // ----------------------------------------------------
-          // 5. Mark successful
-          // ----------------------------------------------------
-
-          uploadedImageFileIdsRef.current.add(
-            fileId,
-          );
-
-          console.log(
-            "[Whiteboard Image] Uploaded:",
-            {
-              elementId: element.id,
-              fileId,
-              mimeType: imageFile.mimeType,
-              backend: result,
-            },
-          );
-        } catch (error) {
-          console.error(
-            "[Whiteboard Image] Upload failed:",
-            fileId,
-            error,
-          );
-        } finally {
-          imageUploadsInFlightRef.current.delete(
-            fileId,
-          );
-        }
-      }
-    },
-    [],
-  );
-
-  const syncWhiteboardStateToBackend =
-  useCallback(
-    async (
-      elements:
-        readonly OrderedExcalidrawElement[],
-      appState: AppState,
-    ) => {
-      const currentElements =
-        elements.filter(
-          (element) =>
-            !element.isDeleted,
-        );
-
-      console.log(
-        "[Whiteboard State] Sending:",
-        currentElements.length,
-        currentElements,
-      );
-
-      const payload = {
-        elements: currentElements,
-
-        app_state: {
-          scrollX:
-            appState.scrollX,
-
-          scrollY:
-            appState.scrollY,
-
-          zoom:
-            appState.zoom?.value ?? 1,
-
-          viewBackgroundColor:
-            appState.viewBackgroundColor,
-        },
-      };
-
-      try {
-        const response =
-          await fetch(
-            `${CHATBOT_BACKEND_URL}/api/whiteboard/state`,
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-
-              body:
-                JSON.stringify(
-                  payload,
-                ),
-            },
-          );
-
-        if (!response.ok) {
-          const errorText =
-            await response.text();
-
-          throw new Error(
-            `Whiteboard state sync failed: ${response.status} ${errorText}`,
-          );
-        }
-
-        const result =
-          await response.json();
-
-        console.log(
-          "[Whiteboard State] Synced:",
-          result,
-        );
-      } catch (error) {
-        console.error(
-          "[Whiteboard State] Sync failed:",
-          error,
-        );
-      }
-    },
-    [],
-  );
   const onChange = (
     elements:
       readonly OrderedExcalidrawElement[],
     appState: AppState,
     files: BinaryFiles,
   ) => {
-    // ============================================================
-    // UPDATE WHITEBOARD HINT VIEWPORT
-    // ============================================================
-
-    const nextHintViewport: HintViewport = {
-      scrollX: appState.scrollX,
-      scrollY: appState.scrollY,
-      zoom: Number(appState.zoom?.value ?? 1),
-      offsetLeft: appState.offsetLeft ?? 0,
-      offsetTop: appState.offsetTop ?? 0,
-    };
-
-    setHintViewport((previous) => {
-      if (
-        previous.scrollX === nextHintViewport.scrollX &&
-        previous.scrollY === nextHintViewport.scrollY &&
-        previous.zoom === nextHintViewport.zoom &&
-        previous.offsetLeft === nextHintViewport.offsetLeft &&
-        previous.offsetTop === nextHintViewport.offsetTop
-      ) {
-        return previous;
-      }
-
-      return nextHintViewport;
-    });
     const publicIPv4 =
       (window as any)
         .__chatbotPublicIPv4 as
         | string
         | undefined;
-    
-    const contributorId =
-      contributorIdRef.current;
 
     let nextElements = elements;
     let didTagStroke = false;
@@ -2592,6 +1371,7 @@ useEffect(() => {
     // ============================================================
 
     if (
+      publicIPv4 &&
       appState.newElement?.type ===
         "freedraw"
     ) {
@@ -2606,6 +1386,7 @@ useEffect(() => {
     // ============================================================
 
     if (
+      publicIPv4 &&
       !appState.newElement &&
       localFreedrawIdsRef.current.size > 0
     ) {
@@ -2618,7 +1399,7 @@ useEffect(() => {
               element.id,
             ) ||
             element.customData
-              ?.createdByContributorId
+              ?.createdByIp
           ) {
             return element;
           }
@@ -2635,15 +1416,8 @@ useEffect(() => {
               customData: {
                 ...element.customData,
 
-                createdByContributorId:
-                  contributorId,
-
-                ...(publicIPv4
-                  ? {
-                      createdByIp:
-                        publicIPv4,
-                    }
-                  : {}),
+                createdByIp:
+                  publicIPv4,
               },
             },
           );
@@ -2665,16 +1439,7 @@ useEffect(() => {
 
 
     // ============================================================
-    // 3. LOG WHITEBOARD ACTION HISTORY
-    // ============================================================
-
-    if (!appState.newElement) {
-      trackWhiteboardActions(
-        nextElements,
-      );
-    }
-    // ============================================================
-    // 4. SYNC ELEMENTS TO LIVE COLLABORATION
+    // 3. SYNC ELEMENTS TO LIVE COLLABORATION
     // ============================================================
 
     if (
@@ -2687,7 +1452,7 @@ useEffect(() => {
 
 
     // ============================================================
-    // 5. SAVE FINISHED STROKES TO strokes.json
+    // 4. SAVE FINISHED STROKES TO strokes.json
     // ============================================================
 
     if (!appState.newElement) {
@@ -2696,28 +1461,10 @@ useEffect(() => {
       );
     }
 
-    // ============================================================
-    // 6. SYNC INSERTED IMAGES TO CHATBOT BACKEND
-    // ============================================================
-
-    void syncImagesToBackend(
-      nextElements,
-      files,
-    );
-    // ============================================================
-    // 7. SYNC CURRENT WHITEBOARD STATE TO CHATBOT BACKEND
-    // ============================================================
-
-    syncWhiteboardStateToBackend(
-      nextElements,
-      appState,
-    );
 
     // ============================================================
-    // 8. EXISTING LOCAL EXCALIDRAW SAVE
+    // 5. EXISTING LOCAL EXCALIDRAW SAVE
     // ============================================================
-
-    
 
     if (!LocalData.isSavePaused()) {
       LocalData.save(
@@ -2965,11 +1712,7 @@ useEffect(() => {
 
   return (
     <div
-      ref={hintOverlayRootRef}
-      style={{
-        height: "100%",
-        position: "relative",
-      }}
+      style={{ height: "100%" }}
       className={clsx("excalidraw-app", {
         "is-collaborating": isCollaborating,
       })}
@@ -3325,107 +2068,7 @@ useEffect(() => {
             ref={debugCanvasRef}
           />
         )}
-      
       </Excalidraw>
-
-      {/* =======================================================
-          WHITEBOARD TUTOR HINT OVERLAY
-          ======================================================= */}
-
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          overflow: "hidden",
-          zIndex: 20,
-        }}
-      >
-        {whiteboardHints.map((hint) => {
-          if (!hint.bbox) {
-            return null;
-          }
-
-          const zoom = hintViewport.zoom;
-
-          const wrapperRect =
-            hintOverlayRootRef.current?.getBoundingClientRect();
-
-          const wrapperLeft =
-            wrapperRect?.left ?? 0;
-
-          const wrapperTop =
-            wrapperRect?.top ?? 0;
-
-          // Convert scene coordinates -> screen coordinates
-          const equationCenterX =
-            (
-              hint.bbox.x +
-              hint.bbox.width / 2 +
-              hintViewport.scrollX
-            ) *
-              zoom +
-            hintViewport.offsetLeft -
-            wrapperLeft;
-
-          const equationTopY =
-            (
-              hint.bbox.y +
-              hintViewport.scrollY
-            ) *
-              zoom +
-            hintViewport.offsetTop -
-            wrapperTop;
-
-          return (
-            <div
-              key={hint.anchor_equation_id}
-              style={{
-                position: "absolute",
-
-                left: equationCenterX,
-                top: equationTopY - 12,
-
-                transform:
-                  "translate(-50%, -100%)",
-
-                maxWidth: 280,
-                minWidth: 160,
-
-                padding: "10px 12px",
-
-                borderRadius: 10,
-
-                background:
-                  "rgba(255,255,255,0.97)",
-
-                border:
-                  "1px solid rgba(0,0,0,0.14)",
-
-                boxShadow:
-                  "0 4px 16px rgba(0,0,0,0.16)",
-
-                fontSize: 13,
-                lineHeight: 1.4,
-
-                textAlign: "left",
-
-                pointerEvents: "none",
-              }}
-            >
-              <strong>💡 Hint</strong>
-
-              <div
-                style={{
-                  marginTop: 4,
-                }}
-              >
-                {hint.instruction}
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 };
@@ -3433,7 +2076,6 @@ useEffect(() => {
 const ExcalidrawApp = () => {
   const isCloudExportWindow =
     window.location.pathname === "/excalidraw-plus-export";
-
   if (isCloudExportWindow) {
     return <ExcalidrawPlusIframeExport />;
   }
@@ -3448,40 +2090,5 @@ const ExcalidrawApp = () => {
     </TopErrorBoundary>
   );
 };
-// const ExcalidrawApp = () => {
-//   const isCloudExportWindow =
-//     window.location.pathname === "/excalidraw-plus-export";
 
-//   const [showPromptPage, setShowPromptPage] =
-//     useState(true);
-
-//   if (isCloudExportWindow) {
-//     return <ExcalidrawPlusIframeExport />;
-//   }
-
-//   if (showPromptPage) {
-//     return (
-//       <PromptPage
-//         onSubmit={(prompt) => {
-//           console.log(
-//             "[Excalidraw App] Received initial prompt:",
-//             prompt,
-//           );
-
-//           setShowPromptPage(false);
-//         }}
-//       />
-//     );
-//   }
-
-//   return (
-//     <TopErrorBoundary>
-//       <Provider store={appJotaiStore}>
-//         <ExcalidrawAPIProvider>
-//           <ExcalidrawWrapper />
-//         </ExcalidrawAPIProvider>
-//       </Provider>
-//     </TopErrorBoundary>
-//   );
-// };
 export default ExcalidrawApp;

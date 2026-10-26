@@ -12,10 +12,12 @@ export default defineConfig(({ mode }) => {
   // To load .env variables
   const envVars = loadEnv(mode, `../`);
   // https://vitejs.dev/config/
-  return {
+    return {
+    base: "/talk-sketch/",
     server: {
-      port: Number(envVars.VITE_APP_PORT || 3000),
-      open: true,
+      host: "0.0.0.0",
+      port: 8099,
+      open: false,
 
       fs: {
         allow: [
@@ -25,59 +27,29 @@ export default defineConfig(({ mode }) => {
       },
 
       proxy: {
-        // ============================================================
-        // Existing chatbot proxy
-        // ============================================================
-
-        "/chatbot-api": {
-          target: "http://10.255.0.11:65532",
+        "/talk-sketch/chatbot-api": {
+          target: "http://127.0.0.1:65532",
           changeOrigin: true,
-
-          rewrite: (requestPath) => {
-            if (
-              requestPath ===
-              "/chatbot-api/health"
-            ) {
-              return "/health";
-            }
-
-            return requestPath.replace(
-              /^\/chatbot-api/,
-              "/api",
-            );
-          },
+          rewrite: (p) =>
+            p === "/talk-sketch/chatbot-api/health"
+              ? "/health"
+              : p.replace(/^\/talk-sketch\/chatbot-api/, "/api"),
         },
-
-
-        // ============================================================
-        // FastAPI backend
-        // ============================================================
-
-        "/api": {
-          target:
-            "http://10.255.0.11:65532",
-
+        "/talk-sketch/api": {
+          target: "http://127.0.0.1:65532",
           changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/talk-sketch/, ""),
         },
-
-
-        // ============================================================
-        // Excalidraw collaboration server
-        // Socket.IO
-        // ============================================================
-
-        "/socket.io": {
-          target:
-            "http://10.255.0.11:65534",
-
+        "/talk-sketch/socket.io": {
+          target: "http://127.0.0.1:65534",
           changeOrigin: true,
-
           ws: true,
+          rewrite: (p) => p.replace(/^\/talk-sketch/, ""),
         },
       },
+
+      allowedHosts: ["nlp-lab.cs.ou.edu", ".trycloudflare.com"],
     },
-    // We need to specify the envDir since now there are no
-    //more located in parallel with the vite.config.ts file but in parent dir
     envDir: "../",
     resolve: {
       alias: [

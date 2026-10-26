@@ -530,15 +530,23 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     this.fallbackInitializationHandler = fallbackInitializationHandler;
 
     try {
+      console.log("[Collab] WS URL:", import.meta.env.VITE_APP_WS_SERVER_URL);
       this.portal.socket = this.portal.open(
         socketIOClient(
-          import.meta.env.VITE_APP_WS_SERVER_URL ||
+          window.location.origin ||
             window.location.origin,
           {
           transports: ["websocket", "polling"],
         }),
         roomId,
         roomKey,
+      );
+
+      this.portal.socket.on("connect", () =>
+        console.log("[Collab] socket connected:", this.portal.socket?.id),
+      );
+      this.portal.socket.on("connect_error", (err) =>
+        console.error("[Collab] socket connect_error:", err.message),
       );
 
       this.portal.socket.once("connect_error", fallbackInitializationHandler);
@@ -569,6 +577,8 @@ class Collab extends PureComponent<CollabProps, CollabState> {
 
       this.saveCollabRoomToFirebase(getSyncableElements(elements));
     }
+
+    console.log("[Collab] received update from server");
 
     // fallback in case you're not alone in the room but still don't receive
     // initial SCENE_INIT message
