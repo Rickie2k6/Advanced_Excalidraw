@@ -24,7 +24,7 @@ class Settings:
 
     backend_host: str = os.getenv(
         "BACKEND_HOST",
-        "10.255.0.11",
+        "127.0.0.1",
     )
 
     backend_port: int = int(
