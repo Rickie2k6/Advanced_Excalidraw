@@ -47,26 +47,13 @@ export function addEllipse({
 }
 
 
-export function writeMath({
-  expression,
-  x,
-  y,
-}) {
+// Forward placement, grouping, and anchor options without dropping them.
+export function writeMath(options) {
   const bridge = getBridge();
-
-  if (
-    typeof bridge.writeMath !== "function"
-  ) {
-    throw new Error(
-      "Excalidraw bridge does not support writeMath.",
-    );
+  if (typeof bridge.writeMath !== "function") {
+    throw new Error("Excalidraw bridge does not support writeMath.");
   }
-
-  return bridge.writeMath({
-    expression,
-    x,
-    y,
-  });
+  return bridge.writeMath(options);
 }
 
 

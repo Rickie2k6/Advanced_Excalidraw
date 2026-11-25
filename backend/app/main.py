@@ -13,7 +13,8 @@ from app.services.room_presence import (
 from app.api.routes import (
     analyze,
     chat,
-    # agent,
+    agents,
+    group_chat,
     health,
     history,
     state,
@@ -25,9 +26,11 @@ from app.api.routes import (
     images,
     whiteboard_state,
 )
-
+from app.core.form_limits import raise_form_part_limit
+raise_form_part_limit()
 @asynccontextmanager
 async def lifespan(
+    
     app: FastAPI,
 ):
     """
@@ -137,10 +140,17 @@ app.include_router(
     prefix="/api",
 )
 
-# app.include_router(
-#     agent.router,
-#     prefix="/api",
-# )
+app.include_router(
+    agents.router,
+    prefix="/api",
+)
+
+# Group chat: agents talk to each other and the human can join in.
+# Endpoints: /api/group-chats/...
+app.include_router(
+    group_chat.router,
+    prefix="/api",
+)
 
 
 @app.get("/")

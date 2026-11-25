@@ -3,8 +3,9 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
-from fastapi import ( 
+from fastapi import (
     APIRouter,
     File,
     HTTPException,
@@ -34,6 +35,16 @@ STROKES_FILE = DATA_DIR / "strokes.json"
 EQUATIONS_FILE = DATA_DIR / "equations.json"
 
 file_lock = asyncio.Lock()
+
+# Fields that describe the recognition itself. They are kept when the same
+# stroke group is regrouped, so the recognition order is not lost.
+RECOGNITION_FIELDS = (
+    "sequence",
+    "recognized_at",
+    "ocr_status",
+    "ocr_error",
+    "source",
+)
 
 
 # ============================================================
@@ -169,6 +180,65 @@ def save_equations_file(
     )
 
 
+def mark_recognized(
+    data: dict,
+    record: dict,
+    now: str,
+) -> None:
+    """
+    Give a newly recognized equation the next
+    recognition sequence number.
+
+    `updated_at` is rewritten on every regroup,
+    so it cannot tell which equation is newest.
+    `sequence` only changes when OCR succeeds.
+    """
+
+    sequence = data.get(
+        "next_sequence",
+        1,
+    )
+
+    record["sequence"] = sequence
+    record["recognized_at"] = now
+    record["ocr_status"] = "done"
+    record.pop("ocr_error", None)
+
+    data["next_sequence"] = sequence + 1
+
+
+async def mark_ocr_failed(
+    equation_id: str,
+    reason: str,
+) -> None:
+    """
+    Remember that OCR failed, so the equation is not
+    mistaken for one that is still being recognized.
+    """
+
+    async with file_lock:
+
+        data = load_equations_file()
+
+        record = data.get(
+            "equations",
+            {},
+        ).get(equation_id)
+
+        if not record:
+            return
+
+        now = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        record["ocr_status"] = "failed"
+        record["ocr_error"] = reason
+        record["updated_at"] = now
+
+        save_equations_file(data)
+
+
 def get_contributors(
     stroke_ids: list[str],
     strokes: dict,
@@ -276,9 +346,7 @@ async def group_equations():
                 )
             )
 
-            equations[
-                equation_id
-            ] = {
+            record = {
                 "equation_id":
                     equation_id,
 
@@ -311,9 +379,24 @@ async def group_equations():
                     now,
             }
 
+            # Keep recognition order and status.
+            for key in RECOGNITION_FIELDS:
+                if key in previous:
+                    record[key] = previous[key]
+
+            equations[
+                equation_id
+            ] = record
+
         data = {
             "updated_at":
                 now,
+
+            "next_sequence":
+                old_data.get(
+                    "next_sequence",
+                    1,
+                ),
 
             "equations":
                 equations,
@@ -407,6 +490,11 @@ async def ocr_equation(
     )
 
     if not image_bytes:
+        await mark_ocr_failed(
+            equation_id,
+            "empty image",
+        )
+
         raise HTTPException(
             status_code=400,
             detail=(
@@ -430,12 +518,22 @@ async def ocr_equation(
         )
 
     except ValueError as error:
+        await mark_ocr_failed(
+            equation_id,
+            str(error),
+        )
+
         raise HTTPException(
             status_code=400,
             detail=str(error),
         ) from error
 
     except RuntimeError as error:
+        await mark_ocr_failed(
+            equation_id,
+            str(error),
+        )
+
         raise HTTPException(
             status_code=500,
             detail=str(error),
@@ -455,6 +553,11 @@ async def ocr_equation(
     )
 
     if not recognized_equation:
+        await mark_ocr_failed(
+            equation_id,
+            "no equation recognized",
+        )
+
         raise HTTPException(
             status_code=422,
             detail=(
@@ -512,6 +615,12 @@ async def ocr_equation(
             "updated_at"
         ] = now
 
+        mark_recognized(
+            data,
+            equation_record,
+            now,
+        )
+
         data[
             "updated_at"
         ] = now
@@ -532,6 +641,11 @@ async def ocr_equation(
 
         "confidence":
             confidence,
+
+        "sequence":
+            equation_record[
+                "sequence"
+            ],
     }
 
 # ============================================================
@@ -593,9 +707,12 @@ async def sync_equations(
                 )
             )
 
-            equations[
-                equation_id
-            ] = {
+            previous = equations.get(
+                equation_id,
+                {},
+            )
+
+            record = {
                 "equation_id":
                     equation_id,
 
@@ -617,6 +734,28 @@ async def sync_equations(
                 "updated_at":
                     now,
             }
+
+            for key in RECOGNITION_FIELDS:
+                if key in previous:
+                    record[key] = previous[key]
+
+            # New or changed recognition result:
+            # it becomes the newest equation.
+            if item.equation and (
+                item.equation
+                != previous.get("equation")
+                or previous.get("sequence")
+                is None
+            ):
+                mark_recognized(
+                    data,
+                    record,
+                    now,
+                )
+
+            equations[
+                equation_id
+            ] = record
 
         data["updated_at"] = (
             now
@@ -642,3 +781,40 @@ async def sync_equations(
 @router.get("/equations")
 async def get_equations():
     return load_equations_file()
+
+
+# ============================================================
+# PREVIEW: WHICH PROBLEM WOULD AN AGENT SOLVE?
+# ============================================================
+
+
+@router.get("/equations/next-problem")
+async def next_problem(
+    mode: Literal["newest", "all"] = "newest",
+    wait_seconds: float = 0,
+):
+    """
+    Show which problem an agent would solve now,
+    which problems are skipped as already solved,
+    and the verified solution steps.
+
+    Read-only: nothing is written to the board.
+    """
+
+    from app.services.whiteboard_problems import (
+        describe_selection,
+        find_problem_to_solve,
+    )
+
+    selection = await find_problem_to_solve(
+        mode,
+        equations_file=EQUATIONS_FILE,
+        wait_seconds=min(
+            max(wait_seconds, 0),
+            20,
+        ),
+    )
+
+    return describe_selection(
+        selection
+    )

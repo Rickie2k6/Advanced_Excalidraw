@@ -1,0 +1,8 @@
+{
+  "file_id": "18b13ba281235ad74e97531e3d9474129c67affb",
+  "image_path": "/tank/homes/student/chuynh/Chatbot/data/whiteboard_images/18b13ba281235ad74e97531e3d9474129c67affb.png",
+  "analysis": "## Image Analysis\n\n### Overall Description\nThis appears to be a **mathematics educational worksheet** displayed on an Excalidraw whiteboard, focusing on **solving systems of equations using elimination**.\n\n---\n\n### Visible Text & Content\n\n#### Header\n- **\"Examples\"** — shown in a red/coral banner at the top\n\n#### Interactive Element\n- **Yellow button**: \"Pick One Example To Try\" — a call-to-action for students\n- **Text input box**: \"Type here\" (with \"AA\" label) — for student responses\n\n---\n\n### Three Math Examples\n\n**Example 1**\n- *\"Solve the system by using elimination.\"*\n- System of equations:\n  - `2x + 3y = 11`\n  - `-2x + 5y = 13`\n\n**Example 2** *(circled/highlighted)*\n- *\"Solve the system using elimination.\"*\n- System of equations:\n  - `-2y + 7x = 5`\n  - `-3y + 7x = 4`\n- Has **hand-drawn annotation/arrow** pointing to it\n\n**Example 3**\n- *\"Solve the system using elimination.\"*\n- System of equations:\n  - `8x - 4y = -4`\n  - `4y = 3x + 14`\n\n---\n\n### Other Elements\n- **\"Z Oliva\"** — green label (likely teacher/author name)\n- **\"saga\"** logo at the bottom center\n- **Page indicator**: \"Page 3 of 13\"\n- A **user avatar** visible near Example 2",
+  "provider": "claude",
+  "model": "claude-sonnet-4-6",
+  "timestamp": "2026-11-20T18:32:34.390922+00:00"
+}

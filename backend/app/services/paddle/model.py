@@ -1,12 +1,12 @@
 from functools import lru_cache
 
-from paddleocr import PaddleOCRVL
-
 from app.core.config import settings
 
 
 @lru_cache(maxsize=1)
 def get_pipeline():
+    from paddleocr import PaddleOCRVL
+
     print(
         "Loading PaddleOCR-VL pipeline..."
     )

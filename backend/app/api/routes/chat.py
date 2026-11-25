@@ -1,15 +1,13 @@
 import json
-from pathlib import Path
 import re
 import base64
 
 from PIL import Image
 
-from app.services.detector import (
-    detect_target,
-)
-from app.services.feeling_chart import is_known_feeling_chart, resolve_feeling_label
+from app.core.paths import WHITEBOARD_IMAGES_DIR
 
+from app.services.feeling_chart import is_known_feeling_chart, resolve_feeling_label
+from app.services.question_solver import solve_question_request
 from app.services.math_agent import solve_linear_steps
 from app.services.math_commands import extract_write_math_action
 from app.services.whiteboard_math import extract_whiteboard_solve_action
@@ -63,6 +61,12 @@ from app.services.llm_service import (
 )
 
 
+def detect_target(*args):
+    # Load the detector only for visual requests, never during API startup.
+    from app.services.detector import detect_target as detect
+    return detect(*args)
+
+
 router = APIRouter()
 
 
@@ -71,11 +75,11 @@ router = APIRouter()
 # ============================================================
 
 def extract_solve_math_action(question: str):
-    match = re.search(
-        r"(?i)\b(?:giải(?: phương trình)?|solve(?: the equation)?)"
-        r"\s*[:：]?\s*"
-        r"([0-9xX+\-=\s]+)",
+    match = re.fullmatch(
+        r"\s*(?:please\s+)?(?:giải(?: phương trình)?|solve(?: the equation)?)"
+        r"\s*[:：]?\s*(.+?)\s*[.]?\s*",
         question,
+        re.IGNORECASE,
     )
 
     if not match:
@@ -133,6 +137,12 @@ async def chat(
                 ),
             )
 
+        elements = scene.get("elements", []) if isinstance(scene, dict) else scene
+        if (not isinstance(elements, list) or
+                any(not isinstance(element, dict) for element in elements) or
+                (isinstance(scene, dict) and not isinstance(scene.get("files", {}), dict))):
+            raise HTTPException(status_code=400, detail="scene_json must contain elements and optional files.")
+
         update_scene(
             scene
         )
@@ -179,6 +189,31 @@ async def chat(
             "[CHAT SCENE] scene_json is NONE"
         )
 
+    # Explicit commands have one backend handling path and require no OCR/LLM.
+    visual_action = extract_write_math_action(question)
+    if visual_action is None:
+        visual_action = extract_solve_math_action(question)
+
+        # "solve question 2": find the question on the worksheet and write in its empty space.
+    if visual_action is None:
+        question_result = await solve_question_request(question, scene)
+        if question_result is not None:
+            return {
+                "question": question,
+                "answer": question_result.message,
+                "analysis": None,
+                "visual_action": question_result.action,
+            }
+    if visual_action is None:
+        visual_action = extract_whiteboard_solve_action(question, load_equations())
+    if visual_action is not None:
+        return {
+            "question": question,
+            "answer": "",  # The widget confirms only after the canvas commit succeeds.
+            "analysis": None,
+            "visual_action": visual_action,
+        }
+
     # ============================================================
     # 2. OPTIONAL FULL-WHITEBOARD ANALYSIS
     # ============================================================
@@ -188,22 +223,13 @@ async def chat(
             whiteboard
         )
 
-        analysis = (
-            await run_in_threadpool(
-                analyze_whiteboard,
-                image,
-            )
-        )
-
-        update_analysis(
-            analysis
-        )
-
-        formatted_analysis = (
-            format_analysis(
-                analysis
-            )
-        )
+        try:
+            analysis = await run_in_threadpool(analyze_whiteboard, image)
+            update_analysis(analysis)
+            formatted_analysis = format_analysis(analysis)
+        except Exception as error:
+            analysis = None
+            formatted_analysis = f"Full-whiteboard OCR unavailable: {error}"
 
     else:
         analysis = None
@@ -231,19 +257,11 @@ async def chat(
     # 4. INITIAL VISUAL ACTION
     # ============================================================
 
-    # First check whether the user explicitly
-    # asked the chatbot to write math.
-    visual_action = extract_solve_math_action(question)
-
-    if visual_action is None:
-        visual_action = extract_whiteboard_solve_action(
-            question, load_equations(), analysis,
-        )
-
-    if visual_action is None:
-        visual_action = extract_write_math_action(question)
-
-    
+    # Explicit commands were handled above. Only screenshot/group OCR can
+    # provide a new solve action at this point.
+    visual_action = extract_whiteboard_solve_action(
+        question, load_equations(), analysis,
+    )
 
     if visual_action:
         print(
@@ -382,9 +400,7 @@ async def chat(
 
         image_context_parts = []
 
-        image_directory = Path(
-            "data/whiteboard_images"
-        )
+        image_directory = WHITEBOARD_IMAGES_DIR
 
         # ========================================================
         # PROCESS EACH UNIQUE IMAGE FILE
@@ -601,7 +617,8 @@ async def chat(
                     else None
                 )
 
-                if target_description and not known_chart:
+                if (target_description and not known_chart
+                        and visual_target.get("action") == "circle"):
                     detections = (
                         await run_in_threadpool(
                             detect_target,
@@ -694,7 +711,7 @@ async def chat(
                     # Only create the image-related
                     # visual action if write_math
                     # has not already been selected.
-                    if visual_action is None:
+                    if visual_action is None and visual_target.get("action") == "circle":
                         visual_action = {
                             "action":
                                 visual_target.get(
@@ -845,11 +862,18 @@ IMPORTANT:
     # 7. LLM RESPONSE
     # ============================================================
 
-    answer = await run_in_threadpool(
-        generate_reply,
-        question,
-        combined_context,
-    )
+    if visual_action is not None:
+        answer = ""
+    elif re.match(r"\s*(?:please\s+|can you\s+)?(?:circle|encircle|khoanh)\b", question, re.IGNORECASE):
+        answer = (
+            "I couldn't locate a target to circle. Make sure the image is on the "
+            "canvas and describe the target clearly. If this persists, check the "
+            "backend image-analysis and detector logs."
+        )
+    else:
+        answer = await run_in_threadpool(
+            generate_reply, question, combined_context,
+        )
     print("[CHAT DEBUG] Question:", question)
     print("[CHAT DEBUG] Visual action:", visual_action)
     # ============================================================

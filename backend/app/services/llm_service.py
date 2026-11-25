@@ -57,3 +57,20 @@ def extract_visual_target(question: str, image_analysis: str) -> dict:
 def select_visual_candidate(question: str, target_description: str,
                             detections: list[dict], image_path: str) -> dict:
     return _call("select_visual_candidate", question, target_description, detections, image_path)
+
+
+def decide_agent_action(context: dict) -> dict:
+    return _call("decide_agent_action", context)
+
+
+def generate_group_message(system: str, prompt: str) -> str:
+    """One agent message in a group chat (see services/group_chat.py)."""
+    return _call("generate_group_message", system, prompt)
+
+def locate_question(prompt: str, system: str) -> str:
+    """Read worksheet OCR blocks for 'solve question N' (see services/question_solver.py).
+
+    Not in __all__ on purpose: test_llm_service checks that every provider implements
+    every name in __all__, and this helper is optional for providers.
+    """
+    return _call("locate_question", prompt, system)

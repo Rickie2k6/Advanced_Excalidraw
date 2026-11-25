@@ -1,3 +1,5 @@
+import { apiUrl } from "../config.js";
+
 /**
  * EN:
  * Detect the client's real public IPv4 by
@@ -91,7 +93,7 @@ export async function confirmPublicIPv4(
   publicIPv4
 ) {
   const response = await fetch(
-    "/talk-sketch/chatbot-api/client-ip/confirm",
+    apiUrl("client-ip/confirm"),
     {
       method: "POST",
 

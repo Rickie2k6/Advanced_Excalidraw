@@ -67,3 +67,9 @@ def extract_visual_target(question: str, image_analysis: str) -> dict:
 def select_visual_candidate(question: str, target_description: str,
                             detections: list[dict], image_path: str) -> dict:
     return common.select_visual_candidate(_request, question, target_description, detections, image_path)
+def decide_agent_action(context: dict) -> dict:
+    return common.decide_agent_action(_request, context)
+
+def locate_question(prompt: str, system: str) -> str:
+    """Worksheet reading for 'solve question N': returns the model's JSON text."""
+    return _request(prompt, system=system, operation="locate_question")

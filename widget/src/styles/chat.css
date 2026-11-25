@@ -213,3 +213,32 @@
 .aicc-chat-message-bot>*:last-child {
   margin-bottom: 0;
 }
+
+.aicc-chat-message-wrapper.aicc-agent-greeting {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.aicc-agent-message-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  margin-top: 6px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #eeecff;
+  color: #4942a5;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.aicc-agent-greeting > .aicc-chat-message {
+  min-width: 0;
+  max-width: calc(100% - 46px);
+  box-sizing: border-box;
+}
