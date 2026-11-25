@@ -1,4 +1,3 @@
-
 type Point = [number, number];
 
 type Glyph = Point[][];
@@ -46,6 +45,41 @@ const GLYPHS: Record<string, Glyph> = {
     [[0, 2], [10, 18]],
     [[10, 2], [0, 18]],
   ],
+  // y, z, ( and ) are needed for systems of equations, e.g. "7x-2(1)=5".
+  "y": [
+    [[0, 2], [5, 11]],
+    [[10, 2], [5, 11], [1, 20]],
+  ],
+  "Y": [
+    [[0, 2], [5, 11]],
+    [[10, 2], [5, 11], [1, 20]],
+  ],
+  "z": [
+    [[0, 4], [10, 4], [0, 18], [10, 18]],
+  ],
+  "Z": [
+    [[0, 4], [10, 4], [0, 18], [10, 18]],
+  ],
+  // Decimals, approximate answers, discriminant and solution pairs.
+  ".": [
+    [[4, 18], [5, 17], [6, 18], [5, 19], [4, 18]],
+  ],
+  ",": [
+    [[6, 16], [6, 19], [3, 23]],
+  ],
+  "≈": [
+    [[0, 8], [3, 6], [7, 10], [10, 8]],
+    [[0, 14], [3, 12], [7, 16], [10, 14]],
+  ],
+  "Δ": [
+    [[5, 1], [0, 19], [10, 19], [5, 1]],
+  ],
+  "(": [
+    [[8, 0], [5, 3], [3, 7], [3, 13], [5, 17], [8, 20]],
+  ],
+  ")": [
+    [[2, 0], [5, 3], [7, 7], [7, 13], [5, 17], [2, 20]],
+  ],
   "+": [
     [[5, 2], [5, 18]],
     [[0, 10], [10, 10]],
@@ -88,7 +122,20 @@ function layoutText(expression: string): MathLayout {
   const strokes: Point[][] = [];
   let cursorX = 0;
 
-  for (const char of expression) {
+  for (let index = 0; index < expression.length; index++) {
+    const char = expression[index];
+    if (char === "^") {
+      const match = expression.slice(index + 1).match(/^(?:\{([+-]?\d+)\}|([+-]?\d+))/);
+      if (!match) throw new Error("Expected an integer exponent after ^.");
+      const exponent = layoutText(match[1] ?? match[2]);
+      const scale = 0.6;
+      strokes.push(...exponent.strokes.map(stroke => stroke.map(
+        ([px, py]): Point => [cursorX + px * scale, py * scale - 10],
+      )));
+      cursorX += exponent.width * scale + CHARACTER_GAP;
+      index += match[0].length;
+      continue;
+    }
     if (char === " ") {
       cursorX += GLYPH_WIDTH;
       continue;
@@ -106,13 +153,14 @@ function layoutText(expression: string): MathLayout {
     cursorX += GLYPH_WIDTH + CHARACTER_GAP;
   }
 
+  const minY = Math.min(0, ...strokes.flatMap(stroke => stroke.map(([, y]) => y)));
   return {
     width: Math.max(
       1,
       cursorX > 0 ? cursorX - CHARACTER_GAP : 1,
     ),
-    height: GLYPH_HEIGHT,
-    strokes,
+    height: GLYPH_HEIGHT - minY,
+    strokes: moveStrokes(strokes, 0, -minY),
   };
 }
 

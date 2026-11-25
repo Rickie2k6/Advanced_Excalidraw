@@ -18,6 +18,7 @@ const { h } = window;
 
 Object.defineProperty(window, "crypto", {
   value: {
+    randomUUID: () => "collab-test-presence-session",
     getRandomValues: (arr: number[]) =>
       arr.forEach((v, i) => (arr[i] = Math.floor(Math.random() * 256))),
     subtle: {
@@ -69,6 +70,18 @@ vi.mock("socket.io-client", () => {
  * i.e. multiplayer history tests could be a good first candidate, as we could test both history stacks simultaneously.
  */
 describe("collaboration", () => {
+  beforeEach(() => {
+    // Presence/IP/OCR requests are outside these collaboration-store tests.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      }),
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
   it("should emit two ephemeral increments even though updates get batched", async () => {
     const durableIncrements: DurableIncrement[] = [];
     const ephemeralIncrements: EphemeralIncrement[] = [];

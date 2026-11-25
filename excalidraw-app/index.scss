@@ -128,3 +128,112 @@
     }
   }
 }
+
+/* Create agent button and panel */
+.excalidraw {
+  .create-agent-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 12px;
+    background: #eeecff;
+    color: #4942a5;
+    font-family: var(--ui-font);
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+
+    &:hover {
+      background: #e0ddff;
+    }
+
+    &:focus-visible {
+      outline: 2px solid #6965db;
+      outline-offset: 3px;
+    }
+  }
+
+  .create-agent-panel {
+    position: absolute;
+    top: 84px;
+    right: 20px;
+    z-index: 10;
+    box-sizing: border-box;
+    width: min(360px, calc(100vw - 40px));
+    max-height: calc(100dvh - 104px);
+    overflow-y: auto;
+    pointer-events: auto;
+    padding: 20px;
+    border: 1px solid #e5e5eb;
+    border-radius: 16px;
+    background: #fff;
+    color: #1b1b1f;
+    box-shadow: 0 8px 28px rgb(0 0 0 / 10%);
+    font-family: var(--ui-font);
+
+    &__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      button {
+        padding: 8px;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+    }
+
+    p {
+      margin: 8px 0 20px;
+      color: #717182;
+      font-size: 14px;
+    }
+
+    label {
+      display: block;
+      margin: 16px 0 8px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    input,
+    textarea {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d6d6df;
+      border-radius: 8px;
+      background: #fff;
+      color: inherit;
+      font: inherit;
+
+      &:focus-visible {
+        outline: 2px solid #6965db;
+        outline-offset: 2px;
+      }
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    input[type="file"] {
+      padding: 16px;
+      border: 1px dashed #9690ef;
+      background: #f5f3ff;
+    }
+  }
+}

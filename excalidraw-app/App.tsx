@@ -149,6 +149,9 @@ import { useSimulatedCollaborators } from "./debugCollaborators";
 import { AIComponents } from "./components/AI";
 import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
 
+import { chatbotApiUrl } from "./chatbot-backend-url";
+import { createCanvasActions } from "./chatbot-bridge";
+
 import "./index.scss";
 
 import { ExcalidrawPlusPromoBanner } from "./components/ExcalidrawPlusPromoBanner";
@@ -417,13 +420,117 @@ type EquationGroupResponse = {
 };
 // gọi chatbot-widget.js
 const ExcalidrawWrapper = () => {
+
+  const [isAgentPanelOpen, setIsAgentPanelOpen] = useState(false);
+  const [isCreatingAgent, setIsCreatingAgent] = useState(false);
+  const [agentError, setAgentError] = useState("");
+  const [agentNotice, setAgentNotice] = useState("");
+  const agentCreationInFlight = useRef(false);
+
+  const handleCreateAgent = async (form: HTMLFormElement) => {
+    if (agentCreationInFlight.current) {
+      return;
+    }
+
+    setAgentError("");
+    setAgentNotice("");
+
+    const formData = new FormData(form);
+    const file = formData.get("file");
+
+    if (!(file instanceof File) || file.size === 0) {
+      setAgentError("Select a non-empty text file.");
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith(".txt")) {
+      setAgentError("This version supports UTF-8 .txt files only.");
+      return;
+    }
+
+    if (file.size > 100_000) {
+      setAgentError("File must be 100 KB or smaller.");
+      return;
+    }
+
+    const name = String(formData.get("name") ?? "").trim();
+    const instructions = String(
+      formData.get("instructions") ?? "",
+    ).trim();
+
+    if (!name || !instructions) {
+      setAgentError("Enter an agent name and instructions.");
+      return;
+    }
+
+    formData.set("name", name);
+    formData.set("instructions", instructions);
+
+    agentCreationInFlight.current = true;
+    setIsCreatingAgent(true);
+
+    try {
+      const response = await fetch(
+        chatbotApiUrl("agents", CHATBOT_BACKEND_URL),
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data.detail === "string"
+            ? data.detail
+            : `Agent creation failed (${response.status}).`,
+        );
+      }
+
+      if (
+        typeof data.agent_id !== "string" ||
+        typeof data.name !== "string" ||
+        data.status !== "ready"
+      ) {
+        throw new Error("Invalid agent creation response.");
+      }
+
+      window.dispatchEvent(
+        new CustomEvent("chatbot:agent-created", {
+          detail: {
+            agent_id: data.agent_id,
+            name: data.name,
+            avatar_id: data.avatar_id,
+            status: data.status,
+            message:
+              data.message ||
+              `Hi, I am ${data.name}. I’m ready to help.`,
+          },
+        }),
+      );
+
+      setAgentNotice(
+        `${data.name} was created. Open the chatbot to see its greeting.`,
+      );
+    } catch (error) {
+      setAgentError(
+        error instanceof Error
+          ? error.message
+          : "Could not create the agent.",
+      );
+    } finally {
+      agentCreationInFlight.current = false;
+      setIsCreatingAgent(false);
+    }
+  };
   const excalidrawAPI = useExcalidrawAPI();
 
 useEffect(() => {
   const initializePublicIPv4 = async () => {
     try {
       const response = await fetch(
-        `${CHATBOT_BACKEND_URL}/api/client-ip`,
+        chatbotApiUrl(`client-ip`, CHATBOT_BACKEND_URL),
       );
 
       if (!response.ok) {
@@ -508,7 +615,7 @@ useEffect(() => {
           // --------------------------------------------
 
           const groupResponse = await fetch(
-            `${CHATBOT_BACKEND_URL}/api/equations/group`,
+            chatbotApiUrl(`equations/group`, CHATBOT_BACKEND_URL),
             {
               method: "POST",
             },
@@ -624,9 +731,9 @@ useEffect(() => {
 
             const ocrResponse =
               await fetch(
-                `${CHATBOT_BACKEND_URL}/api/equations/${encodeURIComponent(
+                chatbotApiUrl(`equations/${encodeURIComponent(
                   equation.equation_id,
-                )}/ocr`,
+                )}/ocr`, CHATBOT_BACKEND_URL),
                 {
                   method: "POST",
                   body: formData,
@@ -721,6 +828,7 @@ useEffect(() => {
               (element) =>
                 element.type === "freedraw",
             )
+            .filter(element => !element.customData?.chatbotGenerated)
             .map((element) => ({
               stroke_id: element.id,
 
@@ -745,13 +853,10 @@ useEffect(() => {
                 element.isDeleted,
             }));
 
-          if (!strokes.length) {
-            return;
-          }
 
           try {
             const response = await fetch(
-              `${CHATBOT_BACKEND_URL}/api/strokes/sync`,
+              chatbotApiUrl(`strokes/sync`, CHATBOT_BACKEND_URL),
               {
                 method: "POST",
 
@@ -820,6 +925,7 @@ useEffect(() => {
     }
 
     const bridge = {
+      ...createCanvasActions(excalidrawAPI),
       /**
        * EN:
        * Return the current non-deleted Excalidraw elements.
@@ -830,6 +936,7 @@ useEffect(() => {
       getScene() {
         return {
           elements: excalidrawAPI.getSceneElements(),
+          files: excalidrawAPI.getFiles(),
         };
       },
 
@@ -962,9 +1069,9 @@ useEffect(() => {
     const joinRoom = async () => {
       try {
         const response = await fetch(
-          `${CHATBOT_BACKEND_URL}/api/presence/join?session_id=${encodeURIComponent(
+          chatbotApiUrl(`presence/join?session_id=${encodeURIComponent(
             sessionId,
-          )}`,
+          )}`, CHATBOT_BACKEND_URL),
           {
             method: "POST",
           },
@@ -996,9 +1103,9 @@ useEffect(() => {
       async () => {
         try {
           const response = await fetch(
-            `${CHATBOT_BACKEND_URL}/api/presence/heartbeat?session_id=${encodeURIComponent(
+            chatbotApiUrl(`presence/heartbeat?session_id=${encodeURIComponent(
               sessionId,
-            )}`,
+            )}`, CHATBOT_BACKEND_URL),
             {
               method: "POST",
             },
@@ -1764,24 +1871,42 @@ useEffect(() => {
         autoFocus={true}
         theme={editorTheme}
         onThemeChange={setAppTheme}
-        renderTopRightUI={(isMobile) => {
+                renderTopRightUI={(isMobile) => {
           if (isMobile || !collabAPI || isCollabDisabled) {
             return null;
           }
 
           return (
             <div className="excalidraw-ui-top-right">
-              {excalidrawAPI?.getEditorInterface().formFactor === "desktop" && (
+              <button
+                type="button"
+                className="create-agent-button"
+                aria-expanded={isAgentPanelOpen}
+                aria-controls="create-agent-panel"
+                onClick={() => setIsAgentPanelOpen((open) => !open)}
+              >
+                <span aria-hidden="true">✦</span>
+                Create agent
+              </button>
+
+              {excalidrawAPI?.getEditorInterface().formFactor ===
+                "desktop" && (
                 <ExcalidrawPlusPromoBanner
                   isSignedIn={isExcalidrawPlusSignedUser}
                 />
               )}
 
-              {collabError.message && <CollabError collabError={collabError} />}
+              {collabError.message && (
+                <CollabError collabError={collabError} />
+              )}
+
               <LiveCollaborationTrigger
                 isCollaborating={isCollaborating}
                 onSelect={() =>
-                  setShareDialogState({ isOpen: true, type: "share" })
+                  setShareDialogState({
+                    isOpen: true,
+                    type: "share",
+                  })
                 }
                 editorInterface={editorInterface}
               />
@@ -1871,6 +1996,95 @@ useEffect(() => {
             }
           }}
         />
+
+        
+
+        {/* NEW: Agent setup panel */}
+        {isAgentPanelOpen && (
+          <section
+            id="create-agent-panel"
+            className="create-agent-panel"
+            aria-labelledby="create-agent-heading"
+          >
+            <div className="create-agent-panel__header">
+              <h2 id="create-agent-heading">Create agent</h2>
+
+              <button
+                type="button"
+                aria-label="Close agent panel"
+                disabled={isCreatingAgent}
+                onClick={() => setIsAgentPanelOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p>Create a math assistant from a text file.</p>
+
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleCreateAgent(event.currentTarget);
+              }}
+            >
+              <label htmlFor="agent-name">Agent name</label>
+              <input
+                id="agent-name"
+                name="name"
+                type="text"
+                placeholder="Math Assistant"
+                maxLength={100}
+                required
+                disabled={isCreatingAgent}
+              />
+
+              <label htmlFor="agent-file">Source file</label>
+              <input
+                id="agent-file"
+                name="file"
+                type="file"
+                accept=".txt,text/plain"
+                required
+                disabled={isCreatingAgent}
+              />
+
+              <p>UTF-8 text files only, up to 100 KB.</p>
+
+              <label htmlFor="agent-instructions">Instructions</label>
+              <textarea
+                id="agent-instructions"
+                name="instructions"
+                rows={4}
+                maxLength={8000}
+                defaultValue="Write requested math on the canvas. Finish after successful execution."
+                required
+                disabled={isCreatingAgent}
+              />
+
+              {agentError && (
+                <p role="alert" style={{ color: "#c92a2a" }}>
+                  {agentError}
+                </p>
+              )}
+
+              {agentNotice && (
+                <p role="status">
+                  {agentNotice}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="create-agent-button"
+                disabled={isCreatingAgent}
+                style={{ width: "100%", marginTop: 16 }}
+              >
+                {isCreatingAgent ? "Creating…" : "Create agent"}
+              </button>
+            </form>
+          </section>
+        )}
+
 
         <AppSidebar />
 
